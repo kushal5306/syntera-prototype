@@ -1,0 +1,32 @@
+# All values are synthetic demonstration data. No proprietary geometry is represented.
+title: Synthetic skid tube-routing demonstration
+synthetic_data: true
+workspace:
+  units: mm
+  dimensions: [600, 400, 300]
+obstacles:
+  - type: box
+    name: central-process-vessel
+    center: [300, 200, 120]
+    size: [100, 160, 180]
+  - type: cylinder
+    name: auxiliary-pump
+    center: [430, 90, 80]
+    radius: 35
+    height: 120
+    axis: z
+start_port:
+  position: [40, 200, 100]
+  direction: [1, 0, 0]
+end_port:
+  position: [560, 200, 100]
+  direction: [-1, 0, 0]
+tube:
+  outer_diameter: 20
+  minimum_bend_radius: 40
+  minimum_clearance: 20
+voxel_resolution: 20
+routing_cost_weights:
+  bend: 80
+  obstacle_proximity: 40
+  port_direction: 1000
