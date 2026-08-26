@@ -1,0 +1,1 @@
+"""Interactive local web application."""

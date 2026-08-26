@@ -4,52 +4,17 @@ from __future__ import annotations
 
 import argparse
 import sys
-import time
 from pathlib import Path
 
 from pydantic import ValidationError
 
 from syntera.config import load_config
-from syntera.geometry.cad import assembly_shapes, export_step, make_tube
-from syntera.reporting.output import write_json, write_preview
-from syntera.routing.astar import AStarRouter
-from syntera.schemas import RouteResult
-from syntera.spatial.occupancy import OccupancyGrid
-from syntera.verification.checks import failed_report, verify_route
+from syntera.pipeline import execute_pipeline
 
 
 def run_demo(config_path: Path, output: Path) -> int:
-    started_at = time.perf_counter()
-    output.mkdir(parents=True, exist_ok=True)
     config = load_config(config_path)
-    assembly = assembly_shapes(config)
-    export_step(assembly, output / "assembly.step")
-
-    grid = OccupancyGrid.from_config(config)
-    route = AStarRouter(grid, config).route()
-    tube = None
-    if route.found:
-        try:
-            tube = make_tube(
-                route.points,
-                config.tube.outer_diameter / 2.0,
-                config.tube.minimum_bend_radius,
-            )
-        except (RuntimeError, ValueError) as error:
-            route = RouteResult(
-                found=False,
-                diagnostic=f"CAD tube construction failed safely: {error}",
-                expanded_nodes=route.expanded_nodes,
-            )
-
-    write_json(route, output / "route.json")
-    write_preview(config, route, output / "route_preview.png")
-    if tube is None:
-        report = failed_report(config, route, time.perf_counter() - started_at)
-    else:
-        export_step([*assembly, tube], output / "routed_assembly.step")
-        report = verify_route(config, route, tube, started_at)
-    write_json(report, output / "assurance_report.json")
+    report = execute_pipeline(config, output).report
 
     print(f"Route found: {report.route_found}")
     print(f"Overall assurance: {'PASS' if report.overall_pass else 'FAIL'}")
@@ -65,6 +30,11 @@ def build_parser() -> argparse.ArgumentParser:
     demo = subparsers.add_parser("demo", help="route and verify the synthetic skid")
     demo.add_argument("--config", type=Path, required=True)
     demo.add_argument("--output", type=Path, required=True)
+    web = subparsers.add_parser("web", help="launch the interactive 3D application")
+    web.add_argument("--config", type=Path, default=Path("examples/demo_skid.yaml"))
+    web.add_argument("--output", type=Path, default=Path("outputs/web"))
+    web.add_argument("--host", default="127.0.0.1")
+    web.add_argument("--port", type=int, default=8000)
     return parser
 
 
@@ -73,6 +43,13 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "demo":
             return run_demo(args.config, args.output)
+        if args.command == "web":
+            import uvicorn
+
+            from syntera.web.app import create_app
+
+            uvicorn.run(create_app(args.config, args.output), host=args.host, port=args.port)
+            return 0
     except (OSError, ValidationError, ValueError) as error:
         print(f"Configuration or execution error: {error}", file=sys.stderr)
         return 2
