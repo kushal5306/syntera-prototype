@@ -28,6 +28,18 @@ ruff check .
 ruff format --check .
 ```
 
+### Interactive 3D application
+
+```bash
+python -m syntera.cli web --config examples/demo_skid.yaml --output outputs/web
+```
+
+Open <http://127.0.0.1:8000>. The browser application can orbit, pan, zoom,
+show/hide and inspect assembly components, edit tube/port/obstacle inputs, generate
+a route, review exact assurance results, and download the generated STEP and JSON
+artifacts. The browser receives display meshes only; all routing and safety checks
+remain in the deterministic Python core.
+
 The demo writes `assembly.step`, `routed_assembly.step`, `route.json`,
 `assurance_report.json`, and `route_preview.png`. Outputs are intentionally
 ignored by Git.
@@ -41,6 +53,7 @@ and includes path length, turn, proximity, and enforced port-direction costs whi
 retaining collision, clearance, direction, and bend feasibility as hard constraints.
 The compressed route becomes tangent straights and exact circular arcs, swept into a
 solid tube. A separate OpenCascade pass tests solid intersection and shape distance.
+FastAPI exposes that same pipeline to a dependency-free WebGL browser interface.
 See [docs/architecture.md](docs/architecture.md) for detail.
 
 ## Assurance scope and limitations
@@ -60,4 +73,3 @@ Phase 2 should add robust STEP import/defeaturing, automatic mesh controls, a
 versioned CalculiX input-deck generator, material/load-case schemas, solver execution
 isolation, mesh-convergence studies, result provenance, and acceptance thresholds.
 Only after those deterministic foundations should orchestration interfaces be considered.
-

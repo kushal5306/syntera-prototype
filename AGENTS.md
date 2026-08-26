@@ -11,6 +11,7 @@ and JSON/STEP reporting. All dimensions are millimetres.
 ```bash
 python -m pip install -e ".[dev]"
 python -m syntera.cli demo --config examples/demo_skid.yaml --output outputs/demo
+python -m syntera.cli web --config examples/demo_skid.yaml --output outputs/web
 pytest
 ruff check .
 ruff format --check .
@@ -23,4 +24,3 @@ and no proprietary data, credentials, caches, or generated CAD in Git. Add unit 
 new constraints and an integration test for output changes. Safety-critical engineering
 checks must remain deterministic and must never be delegated to probabilistic AI. Hard
 constraints may not be traded against routing objectives.
-

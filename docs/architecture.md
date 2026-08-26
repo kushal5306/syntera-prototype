@@ -13,6 +13,9 @@ YAML -> Pydantic schemas -> analytical CAD + inflated occupancy
                               |
                               v
             independent exact B-rep verification -> JSON/STEP
+                              |
+                              v
+               FastAPI -> tessellated display meshes -> WebGL UI
 ```
 
 All coordinates and tolerances use millimetres. Occupancy nodes are tube-centreline
@@ -28,3 +31,7 @@ does not trust the occupancy result: OpenCascade calculates tube/obstacle inters
 exact shape distances, tube bounding-box clearance from workspace faces, and endpoint
 direction alignment.
 
+The web layer calls the same pipeline as the CLI. It may visualize tessellated
+meshes and collect typed inputs, but it cannot issue an assurance pass itself.
+Download endpoints expose only a fixed allowlist beneath the configured output
+directory.
