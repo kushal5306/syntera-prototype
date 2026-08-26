@@ -19,3 +19,20 @@ jobs:
       - run: pytest
       - run: python -m syntera.cli demo --config examples/demo_skid.yaml --output outputs/demo
 
+  container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build --tag syntera-prototype:ci .
+      - run: docker run --detach --name syntera-ci --publish 8000:8000 syntera-prototype:ci
+      - name: Wait for healthy container
+        run: |
+          for attempt in {1..30}; do
+            if [ "$(docker inspect --format='{{.State.Health.Status}}' syntera-ci)" = "healthy" ]; then
+              curl --fail http://127.0.0.1:8000/api/health
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs syntera-ci
+          exit 1

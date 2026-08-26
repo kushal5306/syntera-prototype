@@ -21,6 +21,35 @@ python -m pip install -e ".[dev]"
 
 ## Run
 
+### Docker (recommended)
+
+```bash
+docker compose up --build
+```
+
+Open <http://127.0.0.1:8090>. Generated STEP, JSON, and PNG artifacts persist
+under `outputs/web/latest` on the host. Stop the application with:
+
+```bash
+docker compose down
+```
+
+The container runs as a non-root user, includes a health check, and maps host
+port 8090 to container port 8000. Override the host port when needed:
+
+```bash
+SYNTERA_PORT=9000 docker compose up
+```
+
+PowerShell:
+
+```powershell
+$env:SYNTERA_PORT=9000
+docker compose up
+```
+
+### Native Python
+
 ```bash
 python -m syntera.cli demo --config examples/demo_skid.yaml --output outputs/demo
 pytest

@@ -1,0 +1,12 @@
+services:
+  syntera:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: syntera-prototype:latest
+    init: true
+    ports:
+      - "${SYNTERA_PORT:-8090}:8000"
+    volumes:
+      - ./outputs:/app/outputs
+    restart: unless-stopped
