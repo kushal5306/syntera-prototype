@@ -11,8 +11,9 @@ from fastapi.staticfiles import StaticFiles
 
 from syntera.config import load_config
 from syntera.geometry.cad import assembly_shapes
+from syntera.geometry.step_import import StepImportError
 from syntera.pipeline import execute_pipeline
-from syntera.schemas import DemoConfig
+from syntera.schemas import DemoConfig, StepObstacle
 from syntera.web.mesh import scene_meshes
 
 DOWNLOADS = {
@@ -21,7 +22,16 @@ DOWNLOADS = {
     "route.json",
     "assurance_report.json",
     "route_preview.png",
+    "import_report.json",
 }
+
+
+def _step_paths(config: DemoConfig) -> set[str]:
+    return {
+        str(Path(obstacle.path).resolve())
+        for obstacle in config.obstacles
+        if isinstance(obstacle, StepObstacle)
+    }
 
 
 def create_app(config_path: Path, output_root: Path) -> FastAPI:
@@ -31,6 +41,16 @@ def create_app(config_path: Path, output_root: Path) -> FastAPI:
     lock = Lock()
     app = FastAPI(title="Syntera interactive prototype", version="0.2.0")
     app.mount("/assets", StaticFiles(directory=static), name="assets")
+
+    def checked(config: DemoConfig) -> DemoConfig:
+        """Only STEP files named by the server-side config may be opened from a request."""
+        unknown = _step_paths(config) - _step_paths(load_config(config_path))
+        if unknown:
+            raise HTTPException(
+                status_code=422,
+                detail=f"STEP files not listed in the server configuration: {sorted(unknown)}",
+            )
+        return config
 
     @app.get("/", include_in_schema=False)
     def index() -> FileResponse:
@@ -46,7 +66,10 @@ def create_app(config_path: Path, output_root: Path) -> FastAPI:
 
     @app.post("/api/preview")
     def preview(config: DemoConfig) -> dict:
-        assembly = assembly_shapes(config)
+        try:
+            assembly = assembly_shapes(checked(config))
+        except StepImportError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
         return {
             "workspace": config.workspace.model_dump(mode="json"),
             "meshes": scene_meshes(config, assembly),
@@ -55,7 +78,10 @@ def create_app(config_path: Path, output_root: Path) -> FastAPI:
     @app.post("/api/route")
     def route(config: DemoConfig) -> dict:
         with lock:
-            result = execute_pipeline(config, output)
+            try:
+                result = execute_pipeline(checked(config), output)
+            except StepImportError as error:
+                raise HTTPException(status_code=422, detail=str(error)) from error
             return {
                 "workspace": config.workspace.model_dump(mode="json"),
                 "meshes": scene_meshes(config, result.assembly, result.tube),

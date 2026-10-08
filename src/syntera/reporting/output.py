@@ -10,11 +10,13 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection  # noqa: E402
+from pydantic import BaseModel
 
-from syntera.schemas import AssuranceReport, BoxObstacle, DemoConfig, RouteResult
+from syntera.geometry.step_import import import_step_obstacle
+from syntera.schemas import BoxObstacle, DemoConfig, RouteResult, StepObstacle
 
 
-def write_json(model: RouteResult | AssuranceReport, path: Path) -> None:
+def write_json(model: BaseModel, path: Path) -> None:
     path.write_text(
         json.dumps(model.model_dump(mode="json"), indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
@@ -51,6 +53,17 @@ def write_preview(config: DemoConfig, route: RouteResult, path: Path) -> None:
                 _box_faces(obstacle.center, obstacle.size),
                 alpha=0.28,
                 facecolor="#d95f59",
+            )
+            axes.add_collection3d(collection)
+        elif isinstance(obstacle, StepObstacle):
+            lower, upper = import_step_obstacle(obstacle).summary.routing_bounding_box_mm
+            collection = Poly3DCollection(
+                _box_faces(
+                    tuple((lower[i] + upper[i]) / 2 for i in range(3)),
+                    tuple(upper[i] - lower[i] for i in range(3)),
+                ),
+                alpha=0.2,
+                facecolor="#8c9eb8",
             )
             axes.add_collection3d(collection)
         else:

@@ -11,5 +11,15 @@
 5. **Independent CAD verification.** Grid acceptance is necessary but never sufficient.
 6. **Fail closed.** Invalid configuration, no path, or CAD construction failure returns
    a diagnostic and a failing assurance report rather than questionable geometry.
-7. **Licensing undecided.** No open-source licence is included.
+7. **Proprietary licence.** All rights reserved; see `LICENSE`. No open-source licence is granted.
+8. **Shell FEA of the tube wall.** S8R mid-surface shells capture hoop stress and
+   bend ovalization that beam elements would hide, while staying a structured,
+   dependency-free mesh. Solid meshing waits for robust STEP import.
+9. **One deck per load case.** Independent steps avoid CalculiX load carry-over
+   between steps and keep each acceptance result traceable to one input file.
+10. **Acceptance outside the solver.** Thresholds live in the validated schema and are
+    checked by deterministic Python against parsed results; missing results fail.
+11. **Material-only defeaturing.** Simplifying imported geometry may add material but never
+    remove it; each feature removal is checked by boolean containment, and verification
+    uses the unmodified import so defeaturing cannot hide a collision.
 

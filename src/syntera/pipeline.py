@@ -2,16 +2,26 @@
 
 from __future__ import annotations
 
+import shutil
 import time
 from dataclasses import dataclass
 from pathlib import Path
 
 import cadquery as cq
 
+from syntera.analysis.calculix import write_fea_inputs
 from syntera.geometry.cad import assembly_shapes, export_step, make_tube
+from syntera.geometry.step_import import import_step_obstacle
 from syntera.reporting.output import write_json, write_preview
 from syntera.routing.astar import AStarRouter
-from syntera.schemas import AssuranceReport, DemoConfig, RouteResult
+from syntera.schemas import (
+    AssuranceReport,
+    DemoConfig,
+    FeaManifest,
+    ImportReport,
+    RouteResult,
+    StepObstacle,
+)
 from syntera.spatial.occupancy import OccupancyGrid
 from syntera.verification.checks import failed_report, verify_route
 
@@ -24,6 +34,7 @@ class PipelineResult:
     route: RouteResult
     report: AssuranceReport
     tube: cq.Shape | None
+    fea: FeaManifest | None = None
 
 
 def execute_pipeline(
@@ -41,8 +52,14 @@ def execute_pipeline(
         "route.json",
         "assurance_report.json",
         "route_preview.png",
+        "import_report.json",
     ):
         (output / filename).unlink(missing_ok=True)
+    shutil.rmtree(output / "fea", ignore_errors=True)
+    step_obstacles = [item for item in config.obstacles if isinstance(item, StepObstacle)]
+    if step_obstacles:
+        summaries = [import_step_obstacle(obstacle).summary for obstacle in step_obstacles]
+        write_json(ImportReport(obstacles=summaries), output / "import_report.json")
     assembly = assembly_shapes(config)
     export_step(assembly, output / "assembly.step")
 
@@ -72,4 +89,7 @@ def execute_pipeline(
         export_step([*assembly, tube], output / "routed_assembly.step")
         report = verify_route(config, route, tube, started_at)
     write_json(report, output / "assurance_report.json")
-    return PipelineResult(assembly=assembly, route=route, report=report, tube=tube)
+    fea = None
+    if config.analysis is not None and report.overall_pass:
+        fea = write_fea_inputs(config, route.points, output / "fea")
+    return PipelineResult(assembly=assembly, route=route, report=report, tube=tube, fea=fea)

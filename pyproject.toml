@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Deterministic tube-routing proof of concept for synthetic industrial skids"
 readme = "README.md"
 requires-python = ">=3.11,<3.14"
-license = {text = "All rights reserved; licensing is undecided"}
+license = {file = "LICENSE"}
 dependencies = [
   "cadquery>=2.5,<2.7",
   "numpy>=1.26,<3",

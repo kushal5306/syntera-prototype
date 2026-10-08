@@ -13,11 +13,17 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
+      - name: Install CalculiX solver for FEA deck checks
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends calculix-ccx
       - run: python -m pip install -e ".[dev]"
       - run: ruff check .
       - run: ruff format --check .
       - run: pytest
       - run: python -m syntera.cli demo --config examples/demo_skid.yaml --output outputs/demo
+      - name: Solve demo CalculiX decks and apply acceptance thresholds
+        run: |
+          (cd outputs/demo/fea && for deck in design_pressure self_weight thermal_rise; do ccx -i "$deck"; done)
+          python -m syntera.cli fea-evaluate --config examples/demo_skid.yaml --output outputs/demo
 
   container:
     runs-on: ubuntu-latest

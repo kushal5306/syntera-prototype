@@ -5,7 +5,7 @@ Syntera is a deterministic proof of concept for routing a rigid tube through a
 3D voxel graph, builds an exact swept CAD solid with circular bends, and verifies
 the result independently with OpenCascade before reporting pass or fail.
 
-Licensing is undecided. No open-source licence is granted.
+Proprietary. All rights reserved; no open-source licence is granted. See [LICENSE](LICENSE).
 
 ## Setup
 
@@ -73,6 +73,51 @@ The demo writes `assembly.step`, `routed_assembly.step`, `route.json`,
 `assurance_report.json`, and `route_preview.png`. Outputs are intentionally
 ignored by Git.
 
+### CalculiX analysis decks
+
+When the configuration has an `analysis` section and the route passes assurance,
+the demo also writes `fea/`: a shared `mesh.inp`, one `<load_case>.inp` per load
+case, and `fea_manifest.json` (deck format version, input SHA-256, mesh summary,
+and acceptance limits). Solve the decks with CalculiX, then apply the thresholds:
+
+```bash
+python -m syntera.cli demo --config examples/demo_skid.yaml --output outputs/demo
+(cd outputs/demo/fea && for deck in design_pressure self_weight thermal_rise; do ccx -i "$deck"; done)
+python -m syntera.cli fea-evaluate --config examples/demo_skid.yaml --output outputs/demo
+```
+
+`fea-evaluate` writes `fea/fea_acceptance_report.json` and exits non-zero unless
+every load case is within the allowable von Mises stress (yield strength divided by
+the safety factor) and the displacement limit. A missing or unreadable result file,
+or a manifest whose input hash no longer matches the configuration and route, fails.
+
+Analysis units are mm, N, s, tonne, MPa, and K: steel density is about
+`7.85e-9` tonne/mm³ and standard gravity is `9810` mm/s².
+
+### Importing equipment geometry from STEP
+
+An obstacle may reference a STEP file instead of an analytical box or cylinder:
+
+```yaml
+obstacles:
+  - type: step
+    name: process-vessel
+    path: geometry/vessel.step     # relative paths resolve against the YAML file
+    translation: [300, 200, 120]   # mm, applied after import
+    defeaturing:
+      max_feature_radius: 10       # fill holes and rounds with radius below 10 mm
+      envelope: exact              # or bounding_box for a fast, coarse envelope
+```
+
+STEP units are converted to millimetres on import. The file must contain closed, valid
+solids; unreadable files, surface-only models, and invalid solids fail closed with a
+diagnostic. Defeaturing is conservative: a hole or round is removed only when the result
+is a valid solid that fully contains the original, so concave rounds and removals that
+would delete material are rejected. Routing occupancy uses this simplified solid, while
+the exact assurance checks always run against the unmodified imported geometry. Each run
+writes `import_report.json` with the source SHA-256, feature counts, and volumes. The web
+application only opens STEP files named in its server-side configuration.
+
 ## Architecture
 
 Pydantic validates an explicitly millimetre-based input. CadQuery creates synthetic
@@ -87,18 +132,29 @@ See [docs/architecture.md](docs/architecture.md) for detail.
 
 ## Assurance scope and limitations
 
-- Input obstacles are axis-aligned boxes and cylinders only.
+- Analytical obstacles are axis-aligned boxes and cylinders. STEP obstacles may be
+  translated but not rotated, and defeaturing only removes cylindrical, spherical, and
+  toroidal features that OpenCascade can delete as a group of adjacent curved faces
+  (for example, blind holes are currently kept).
+- Occupancy for exact STEP obstacles costs one OpenCascade distance query per voxel.
 - Ports and workspace extents must align with voxel resolution.
 - Routing uses orthogonal moves and 90-degree bends.
 - The generated object is the tube's exterior envelope, not a hollow manufacturing model.
 - STEP verification uses exact B-rep collision/distance, but routing completeness is
   resolution-dependent.
 - The preview is diagnostic only and is never evidence for a pass.
+- FEA models the tube mid-surface with structured S8R shells, linear-elastic
+  isotropic material, small-displacement statics, and both ends fully clamped at
+  their ports. Each load case is solved independently; combinations, supports along
+  the run, fatigue, and code-based stress classification are not modelled.
+- Peak von Mises includes clamp-edge stress concentrations, which is conservative.
+  Mesh-convergence studies are not yet automated.
 - This research prototype is not certified for production or safety-critical use.
 
 ## Next milestones
 
-Phase 2 should add robust STEP import/defeaturing, automatic mesh controls, a
-versioned CalculiX input-deck generator, material/load-case schemas, solver execution
-isolation, mesh-convergence studies, result provenance, and acceptance thresholds.
+Phase 2 now includes conservative STEP import/defeaturing, material/load-case schemas,
+a structured tube shell mesh with quality limits, a versioned CalculiX input-deck
+generator with input-hash provenance, and acceptance thresholds. It should still add
+solver execution isolation, automated mesh-convergence studies, and fuller result provenance.
 Only after those deterministic foundations should orchestration interfaces be considered.
