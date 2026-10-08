@@ -7,13 +7,20 @@ from itertools import product
 
 import numpy as np
 
-from syntera.schemas import BoxObstacle, DemoConfig, Obstacle, Point3
+from syntera.geometry.step_import import import_step_obstacle, point_to_imported_distance
+from syntera.schemas import BoxObstacle, DemoConfig, Obstacle, Point3, StepObstacle
 
 Index3 = tuple[int, int, int]
 
 
 def point_to_obstacle_distance(point: Point3, obstacle: Obstacle) -> float:
-    """Return Euclidean distance from a point to an obstacle solid (zero inside)."""
+    """Return Euclidean distance from a point to an obstacle solid (zero inside).
+
+    STEP obstacles are measured against their conservative routing solid, which contains
+    the imported geometry, so the result never exceeds the true distance.
+    """
+    if isinstance(obstacle, StepObstacle):
+        return point_to_imported_distance(point, import_step_obstacle(obstacle))
     p = np.asarray(point, dtype=float)
     center = np.asarray(obstacle.center, dtype=float)
     if isinstance(obstacle, BoxObstacle):
@@ -36,7 +43,7 @@ class OccupancyGrid:
     axes: tuple[np.ndarray, np.ndarray, np.ndarray]
     resolution: float
     inflation_radius: float
-    obstacles: tuple[Obstacle, ...]
+    obstacle_distance: np.ndarray
 
     @classmethod
     def from_config(cls, config: DemoConfig) -> OccupancyGrid:
@@ -47,6 +54,7 @@ class OccupancyGrid:
         )
         shape = tuple(len(axis) for axis in axes)
         occupied = np.zeros(shape, dtype=bool)
+        obstacle_distance = np.full(shape, np.inf, dtype=float)
         inflation = config.tube.outer_diameter / 2.0 + config.tube.minimum_clearance
 
         for index in product(*(range(size) for size in shape)):
@@ -55,11 +63,14 @@ class OccupancyGrid:
                 min(coordinate, dimension - coordinate)
                 for coordinate, dimension in zip(point, config.workspace.dimensions, strict=False)
             )
-            occupied[index] = boundary_clearance + 1e-9 < inflation or any(
-                point_to_obstacle_distance(point, obstacle) + 1e-9 < inflation
-                for obstacle in config.obstacles
+            obstacle_distance[index] = min(
+                (point_to_obstacle_distance(point, obstacle) for obstacle in config.obstacles),
+                default=np.inf,
             )
-        return cls(occupied, axes, resolution, inflation, tuple(config.obstacles))
+            occupied[index] = (
+                boundary_clearance + 1e-9 < inflation or obstacle_distance[index] + 1e-9 < inflation
+            )
+        return cls(occupied, axes, resolution, inflation, obstacle_distance)
 
     @property
     def shape(self) -> tuple[int, int, int]:
@@ -81,11 +92,7 @@ class OccupancyGrid:
 
     def centreline_clearance(self, index: Index3) -> float:
         point = self.point(index)
-        obstacle_distance = min(
-            (point_to_obstacle_distance(point, obstacle) for obstacle in self.obstacles),
-            default=float("inf"),
-        )
         boundary_distance = min(
             min(point[axis], self.axes[axis][-1] - point[axis]) for axis in range(3)
         )
-        return min(obstacle_distance, boundary_distance)
+        return min(float(self.obstacle_distance[index]), boundary_distance)

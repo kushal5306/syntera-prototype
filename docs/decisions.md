@@ -11,5 +11,8 @@
 5. **Independent CAD verification.** Grid acceptance is necessary but never sufficient.
 6. **Fail closed.** Invalid configuration, no path, or CAD construction failure returns
    a diagnostic and a failing assurance report rather than questionable geometry.
-7. **Licensing undecided.** No open-source licence is included.
+7. **Material-only defeaturing.** Simplifying imported geometry may add material but never
+   remove it; each feature removal is checked by boolean containment, and verification
+   uses the unmodified import so defeaturing cannot hide a collision.
+8. **Licensing undecided.** No open-source licence is included.
 

@@ -35,7 +35,34 @@ class CylinderObstacle(StrictModel):
     axis: Literal["x", "y", "z"] = "z"
 
 
-Obstacle = Annotated[BoxObstacle | CylinderObstacle, Field(discriminator="type")]
+class StepDefeaturing(StrictModel):
+    """Conservative simplification applied to imported geometry before routing.
+
+    Defeaturing may only add material: every accepted removal must yield a valid solid that
+    fully contains the geometry it replaces, so routing clearance is never overstated.
+    """
+
+    max_feature_radius: Annotated[float, Field(ge=0)] = 0.0
+    envelope: Literal["exact", "bounding_box"] = "exact"
+
+
+class StepObstacle(StrictModel):
+    """Equipment geometry imported from a STEP file (converted to millimetres on import)."""
+
+    type: Literal["step"]
+    name: str = Field(min_length=1)
+    path: str = Field(min_length=1)
+    translation: Point3 = (0.0, 0.0, 0.0)
+    defeaturing: StepDefeaturing = Field(default_factory=StepDefeaturing)
+
+    @model_validator(mode="after")
+    def path_must_name_step_file(self) -> StepObstacle:
+        if not self.path.lower().endswith((".step", ".stp")):
+            raise ValueError("STEP obstacle path must end in .step or .stp")
+        return self
+
+
+Obstacle = Annotated[BoxObstacle | CylinderObstacle | StepObstacle, Field(discriminator="type")]
 
 
 class Port(StrictModel):
@@ -101,6 +128,26 @@ class RouteResult(StrictModel):
     length: float = 0.0
     diagnostic: str | None = None
     expanded_nodes: int = 0
+
+
+class StepImportSummary(StrictModel):
+    """Provenance and defeaturing outcome for one imported STEP obstacle."""
+
+    name: str
+    source_path: str
+    source_sha256: str
+    solid_count: int
+    envelope: Literal["exact", "bounding_box"]
+    candidate_features: int
+    removed_features: int
+    rejected_features: int
+    original_volume_mm3: float
+    routing_volume_mm3: float
+    routing_bounding_box_mm: tuple[Point3, Point3]
+
+
+class ImportReport(StrictModel):
+    obstacles: list[StepImportSummary]
 
 
 class AssuranceReport(StrictModel):

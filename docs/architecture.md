@@ -18,6 +18,11 @@ YAML -> Pydantic schemas -> analytical CAD + inflated occupancy
                FastAPI -> tessellated display meshes -> WebGL UI
 ```
 
+STEP obstacles are imported once per file revision. The exact solids feed CAD export and
+verification; a defeatured routing solid, accepted only where it contains the original,
+feeds occupancy. Occupancy stores each node's obstacle distance so A* proximity costs
+reuse it instead of recomputing distances.
+
 All coordinates and tolerances use millimetres. Occupancy nodes are tube-centreline
 positions. The hard inflation radius is `outer_diameter / 2 + minimum_clearance`;
 workspace faces receive the same treatment. A* carries incoming direction and straight
