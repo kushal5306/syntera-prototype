@@ -30,3 +30,26 @@ routing_cost_weights:
   bend: 80
   obstacle_proximity: 40
   port_direction: 1000
+analysis:
+  wall_thickness: 2
+  material:
+    name: stainless_316
+    elastic_modulus_mpa: 193000
+    poisson_ratio: 0.3
+    yield_strength_mpa: 205
+    density_tonne_per_mm3: 8.0e-9
+    thermal_expansion_per_k: 1.6e-5
+  load_cases:
+    - name: design_pressure
+      internal_pressure_mpa: 10
+    - name: self_weight
+      gravity_mm_per_s2: [0, 0, -9810]
+    - name: thermal_rise
+      temperature_change_k: 30
+  mesh:
+    circumferential_elements: 16
+    minimum_elements_per_bend: 6
+    maximum_aspect_ratio: 5
+  acceptance:
+    stress_safety_factor: 1.5
+    maximum_displacement_mm: 1.0

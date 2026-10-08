@@ -10,11 +10,12 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection  # noqa: E402
+from pydantic import BaseModel
 
-from syntera.schemas import AssuranceReport, BoxObstacle, DemoConfig, RouteResult
+from syntera.schemas import BoxObstacle, DemoConfig, RouteResult
 
 
-def write_json(model: RouteResult | AssuranceReport, path: Path) -> None:
+def write_json(model: BaseModel, path: Path) -> None:
     path.write_text(
         json.dumps(model.model_dump(mode="json"), indent=2, sort_keys=True) + "\n",
         encoding="utf-8",

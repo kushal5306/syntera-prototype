@@ -12,6 +12,7 @@ and JSON/STEP reporting. All dimensions are millimetres.
 docker compose up --build
 python -m pip install -e ".[dev]"
 python -m syntera.cli demo --config examples/demo_skid.yaml --output outputs/demo
+python -m syntera.cli fea-evaluate --config examples/demo_skid.yaml --output outputs/demo
 python -m syntera.cli web --config examples/demo_skid.yaml --output outputs/web
 pytest
 ruff check .

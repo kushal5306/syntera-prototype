@@ -31,3 +31,24 @@ def base_data() -> dict:
 @pytest.fixture
 def copy_data():
     return deepcopy
+
+
+@pytest.fixture
+def analysis_data() -> dict:
+    return {
+        "wall_thickness": 1.5,
+        "material": {
+            "name": "steel",
+            "elastic_modulus_mpa": 200000,
+            "poisson_ratio": 0.3,
+            "yield_strength_mpa": 250,
+            "density_tonne_per_mm3": 7.85e-9,
+            "thermal_expansion_per_k": 1.2e-5,
+        },
+        "load_cases": [
+            {"name": "pressure", "internal_pressure_mpa": 5},
+            {"name": "weight", "gravity_mm_per_s2": [0, 0, -9810]},
+            {"name": "thermal", "temperature_change_k": 40},
+        ],
+        "acceptance": {"stress_safety_factor": 1.5, "maximum_displacement_mm": 1.0},
+    }

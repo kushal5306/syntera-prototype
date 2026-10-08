@@ -70,6 +70,74 @@ class RoutingWeights(StrictModel):
     port_direction: Annotated[float, Field(ge=0)] = 1000.0
 
 
+Identifier = Annotated[str, Field(pattern=r"^[a-z][a-z0-9_]{0,31}$")]
+
+
+class Material(StrictModel):
+    """Linear-elastic isotropic material in the mm-N-s-tonne unit system (stress in MPa)."""
+
+    name: Identifier
+    elastic_modulus_mpa: PositiveMm
+    poisson_ratio: Annotated[float, Field(gt=0, lt=0.5)]
+    yield_strength_mpa: PositiveMm
+    density_tonne_per_mm3: Annotated[float, Field(gt=0)] | None = None
+    thermal_expansion_per_k: Annotated[float, Field(gt=0)] | None = None
+
+
+class LoadCase(StrictModel):
+    """One independent static load case; both tube ends are clamped at their ports."""
+
+    name: Identifier
+    internal_pressure_mpa: Annotated[float, Field(ge=0)] = 0.0
+    gravity_mm_per_s2: Point3 | None = None
+    temperature_change_k: float = 0.0
+
+    @model_validator(mode="after")
+    def must_apply_a_load(self) -> LoadCase:
+        gravity = self.gravity_mm_per_s2 is not None and any(self.gravity_mm_per_s2)
+        if not (self.internal_pressure_mpa > 0 or gravity or self.temperature_change_k != 0):
+            raise ValueError(f"load case '{self.name}' applies no load")
+        return self
+
+
+class MeshControls(StrictModel):
+    """Structured quadratic-shell mesh controls for the tube mid-surface."""
+
+    circumferential_elements: Annotated[int, Field(ge=8, le=128)] = 16
+    maximum_axial_element_length: PositiveMm | None = None
+    minimum_elements_per_bend: Annotated[int, Field(ge=2, le=64)] = 6
+    maximum_aspect_ratio: Annotated[float, Field(ge=1)] = 5.0
+
+
+class AcceptanceThresholds(StrictModel):
+    """Deterministic pass limits applied to every load case."""
+
+    stress_safety_factor: Annotated[float, Field(ge=1)] = 1.5
+    maximum_displacement_mm: PositiveMm
+
+
+class AnalysisSpecification(StrictModel):
+    wall_thickness: PositiveMm
+    material: Material
+    load_cases: list[LoadCase] = Field(min_length=1)
+    mesh: MeshControls = Field(default_factory=MeshControls)
+    acceptance: AcceptanceThresholds
+
+    @model_validator(mode="after")
+    def load_cases_must_be_supported(self) -> AnalysisSpecification:
+        names = [case.name for case in self.load_cases]
+        if len(names) != len(set(names)):
+            raise ValueError("load case names must be unique")
+        for case in self.load_cases:
+            if case.gravity_mm_per_s2 is not None and self.material.density_tonne_per_mm3 is None:
+                raise ValueError(f"load case '{case.name}' needs material density for gravity")
+            if case.temperature_change_k != 0 and self.material.thermal_expansion_per_k is None:
+                raise ValueError(
+                    f"load case '{case.name}' needs material thermal expansion for temperature"
+                )
+        return self
+
+
 class DemoConfig(StrictModel):
     title: str = Field(min_length=1)
     synthetic_data: Literal[True]
@@ -80,6 +148,7 @@ class DemoConfig(StrictModel):
     tube: TubeSpecification
     voxel_resolution: PositiveMm
     routing_cost_weights: RoutingWeights = Field(default_factory=RoutingWeights)
+    analysis: AnalysisSpecification | None = None
 
     @model_validator(mode="after")
     def geometry_must_be_inside_workspace(self) -> DemoConfig:
@@ -92,6 +161,9 @@ class DemoConfig(StrictModel):
                 raise ValueError(f"{label} port lies outside workspace")
         if self.start_port.position == self.end_port.position:
             raise ValueError("start and end ports must differ")
+        analysis = self.analysis
+        if analysis is not None and analysis.wall_thickness >= self.tube.outer_diameter / 2:
+            raise ValueError("wall thickness must be less than the tube radius")
         return self
 
 
@@ -116,4 +188,52 @@ class AssuranceReport(StrictModel):
     end_port_alignment: bool
     execution_time_seconds: float
     overall_pass: bool
+    failure_reasons: list[str]
+
+
+class FeaMeshSummary(StrictModel):
+    element_type: Literal["S8R"]
+    nodes: int
+    elements: int
+    axial_elements: int
+    circumferential_elements: int
+    mid_surface_radius_mm: float
+    maximum_aspect_ratio: float
+
+
+class FeaLoadCaseDeck(StrictModel):
+    name: str
+    deck_file: str
+    result_file: str
+
+
+class FeaManifest(StrictModel):
+    """Provenance and acceptance limits for one set of generated CalculiX decks."""
+
+    deck_format_version: int
+    generator: str
+    input_sha256: str
+    generated: bool
+    diagnostic: str | None = None
+    mesh_file: str | None = None
+    mesh: FeaMeshSummary | None = None
+    allowable_von_mises_mpa: float
+    maximum_displacement_mm: float
+    load_cases: list[FeaLoadCaseDeck] = Field(default_factory=list)
+
+
+class FeaCaseAcceptance(StrictModel):
+    name: str
+    maximum_von_mises_mpa: float | None
+    allowable_von_mises_mpa: float
+    maximum_displacement_mm: float | None
+    allowed_displacement_mm: float
+    passed: bool
+    failure_reasons: list[str]
+
+
+class FeaAcceptanceReport(StrictModel):
+    input_sha256: str
+    overall_pass: bool
+    load_cases: list[FeaCaseAcceptance]
     failure_reasons: list[str]

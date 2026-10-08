@@ -73,6 +73,27 @@ The demo writes `assembly.step`, `routed_assembly.step`, `route.json`,
 `assurance_report.json`, and `route_preview.png`. Outputs are intentionally
 ignored by Git.
 
+### CalculiX analysis decks
+
+When the configuration has an `analysis` section and the route passes assurance,
+the demo also writes `fea/`: a shared `mesh.inp`, one `<load_case>.inp` per load
+case, and `fea_manifest.json` (deck format version, input SHA-256, mesh summary,
+and acceptance limits). Solve the decks with CalculiX, then apply the thresholds:
+
+```bash
+python -m syntera.cli demo --config examples/demo_skid.yaml --output outputs/demo
+(cd outputs/demo/fea && for deck in design_pressure self_weight thermal_rise; do ccx -i "$deck"; done)
+python -m syntera.cli fea-evaluate --config examples/demo_skid.yaml --output outputs/demo
+```
+
+`fea-evaluate` writes `fea/fea_acceptance_report.json` and exits non-zero unless
+every load case is within the allowable von Mises stress (yield strength divided by
+the safety factor) and the displacement limit. A missing or unreadable result file,
+or a manifest whose input hash no longer matches the configuration and route, fails.
+
+Analysis units are mm, N, s, tonne, MPa, and K: steel density is about
+`7.85e-9` tonne/mm³ and standard gravity is `9810` mm/s².
+
 ## Architecture
 
 Pydantic validates an explicitly millimetre-based input. CadQuery creates synthetic
@@ -94,11 +115,18 @@ See [docs/architecture.md](docs/architecture.md) for detail.
 - STEP verification uses exact B-rep collision/distance, but routing completeness is
   resolution-dependent.
 - The preview is diagnostic only and is never evidence for a pass.
+- FEA models the tube mid-surface with structured S8R shells, linear-elastic
+  isotropic material, small-displacement statics, and both ends fully clamped at
+  their ports. Each load case is solved independently; combinations, supports along
+  the run, fatigue, and code-based stress classification are not modelled.
+- Peak von Mises includes clamp-edge stress concentrations, which is conservative.
+  Mesh-convergence studies are not yet automated.
 - This research prototype is not certified for production or safety-critical use.
 
 ## Next milestones
 
-Phase 2 should add robust STEP import/defeaturing, automatic mesh controls, a
-versioned CalculiX input-deck generator, material/load-case schemas, solver execution
-isolation, mesh-convergence studies, result provenance, and acceptance thresholds.
+Phase 2 now includes material/load-case schemas, a structured tube shell mesh with
+quality limits, a versioned CalculiX input-deck generator with input-hash provenance,
+and acceptance thresholds. It should still add robust STEP import/defeaturing, solver
+execution isolation, automated mesh-convergence studies, and fuller result provenance.
 Only after those deterministic foundations should orchestration interfaces be considered.
