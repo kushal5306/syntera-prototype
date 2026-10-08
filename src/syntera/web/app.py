@@ -27,6 +27,7 @@ DOWNLOADS = {
     "assurance_report.json",
     "route_preview.png",
     "import_report.json",
+    "metrics.json",
 }
 
 
@@ -131,6 +132,7 @@ def create_app(config_path: Path, output_root: Path) -> FastAPI:
                 "fea": fea_payload(config, result, output),
                 "route": result.route.model_dump(mode="json"),
                 "assurance": result.report.model_dump(mode="json"),
+                "metrics": result.metrics.model_dump(mode="json") if result.metrics else None,
                 "downloads": [
                     {"name": name, "url": f"/api/download/{name}"}
                     for name in sorted(DOWNLOADS)
