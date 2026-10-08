@@ -11,5 +11,5 @@
 5. **Independent CAD verification.** Grid acceptance is necessary but never sufficient.
 6. **Fail closed.** Invalid configuration, no path, or CAD construction failure returns
    a diagnostic and a failing assurance report rather than questionable geometry.
-7. **Licensing undecided.** No open-source licence is included.
+7. **Proprietary licence.** All rights reserved; see `LICENSE`. No open-source licence is granted.
 

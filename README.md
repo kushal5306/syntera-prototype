@@ -5,7 +5,7 @@ Syntera is a deterministic proof of concept for routing a rigid tube through a
 3D voxel graph, builds an exact swept CAD solid with circular bends, and verifies
 the result independently with OpenCascade before reporting pass or fail.
 
-Licensing is undecided. No open-source licence is granted.
+Proprietary. All rights reserved; no open-source licence is granted. See [LICENSE](LICENSE).
 
 ## Setup
 
