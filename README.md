@@ -94,6 +94,30 @@ or a manifest whose input hash no longer matches the configuration and route, fa
 Analysis units are mm, N, s, tonne, MPa, and K: steel density is about
 `7.85e-9` tonne/mm³ and standard gravity is `9810` mm/s².
 
+### Importing equipment geometry from STEP
+
+An obstacle may reference a STEP file instead of an analytical box or cylinder:
+
+```yaml
+obstacles:
+  - type: step
+    name: process-vessel
+    path: geometry/vessel.step     # relative paths resolve against the YAML file
+    translation: [300, 200, 120]   # mm, applied after import
+    defeaturing:
+      max_feature_radius: 10       # fill holes and rounds with radius below 10 mm
+      envelope: exact              # or bounding_box for a fast, coarse envelope
+```
+
+STEP units are converted to millimetres on import. The file must contain closed, valid
+solids; unreadable files, surface-only models, and invalid solids fail closed with a
+diagnostic. Defeaturing is conservative: a hole or round is removed only when the result
+is a valid solid that fully contains the original, so concave rounds and removals that
+would delete material are rejected. Routing occupancy uses this simplified solid, while
+the exact assurance checks always run against the unmodified imported geometry. Each run
+writes `import_report.json` with the source SHA-256, feature counts, and volumes. The web
+application only opens STEP files named in its server-side configuration.
+
 ## Architecture
 
 Pydantic validates an explicitly millimetre-based input. CadQuery creates synthetic
@@ -108,7 +132,11 @@ See [docs/architecture.md](docs/architecture.md) for detail.
 
 ## Assurance scope and limitations
 
-- Input obstacles are axis-aligned boxes and cylinders only.
+- Analytical obstacles are axis-aligned boxes and cylinders. STEP obstacles may be
+  translated but not rotated, and defeaturing only removes cylindrical, spherical, and
+  toroidal features that OpenCascade can delete as a group of adjacent curved faces
+  (for example, blind holes are currently kept).
+- Occupancy for exact STEP obstacles costs one OpenCascade distance query per voxel.
 - Ports and workspace extents must align with voxel resolution.
 - Routing uses orthogonal moves and 90-degree bends.
 - The generated object is the tube's exterior envelope, not a hollow manufacturing model.
@@ -125,8 +153,8 @@ See [docs/architecture.md](docs/architecture.md) for detail.
 
 ## Next milestones
 
-Phase 2 now includes material/load-case schemas, a structured tube shell mesh with
-quality limits, a versioned CalculiX input-deck generator with input-hash provenance,
-and acceptance thresholds. It should still add robust STEP import/defeaturing, solver
-execution isolation, automated mesh-convergence studies, and fuller result provenance.
+Phase 2 now includes conservative STEP import/defeaturing, material/load-case schemas,
+a structured tube shell mesh with quality limits, a versioned CalculiX input-deck
+generator with input-hash provenance, and acceptance thresholds. It should still add
+solver execution isolation, automated mesh-convergence studies, and fuller result provenance.
 Only after those deterministic foundations should orchestration interfaces be considered.

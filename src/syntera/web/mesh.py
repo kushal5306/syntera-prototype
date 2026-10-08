@@ -67,6 +67,13 @@ def shape_mesh(
     }
 
 
+OBSTACLE_COLORS: dict[str, Color] = {
+    "box": (0.88, 0.34, 0.25),
+    "cylinder": (0.95, 0.58, 0.18),
+    "step": (0.55, 0.62, 0.72),
+}
+
+
 def scene_meshes(
     config: DemoConfig,
     assembly: list[cq.Shape],
@@ -78,7 +85,7 @@ def scene_meshes(
     for index, (obstacle, shape) in enumerate(
         zip(config.obstacles, assembly[: len(config.obstacles)], strict=True)
     ):
-        color: Color = (0.88, 0.34, 0.25) if obstacle.type == "box" else (0.95, 0.58, 0.18)
+        color: Color = OBSTACLE_COLORS[obstacle.type]
         meshes.append(
             shape_mesh(
                 f"obstacle-{index}",

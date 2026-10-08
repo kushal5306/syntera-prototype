@@ -8,7 +8,8 @@ import cadquery as cq
 from OCP.BRepExtrema import BRepExtrema_DistShapeShape
 
 from syntera.geometry.centreline import LineSegment, centreline_segments, unit_between
-from syntera.schemas import BoxObstacle, DemoConfig, Obstacle, Point3
+from syntera.geometry.step_import import import_step_obstacle
+from syntera.schemas import BoxObstacle, DemoConfig, Obstacle, Point3, StepObstacle
 
 
 def _vector(point: Point3) -> cq.Vector:
@@ -16,7 +17,9 @@ def _vector(point: Point3) -> cq.Vector:
 
 
 def obstacle_shape(obstacle: Obstacle) -> cq.Shape:
-    """Construct an obstacle centred on its configured position."""
+    """Construct an obstacle at its configured position (exact geometry for STEP imports)."""
+    if isinstance(obstacle, StepObstacle):
+        return import_step_obstacle(obstacle).original
     if isinstance(obstacle, BoxObstacle):
         shape = cq.Solid.makeBox(*obstacle.size)
         offset = tuple(obstacle.center[index] - obstacle.size[index] / 2.0 for index in range(3))

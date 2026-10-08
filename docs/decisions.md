@@ -19,4 +19,7 @@
    between steps and keep each acceptance result traceable to one input file.
 10. **Acceptance outside the solver.** Thresholds live in the validated schema and are
     checked by deterministic Python against parsed results; missing results fail.
+11. **Material-only defeaturing.** Simplifying imported geometry may add material but never
+    remove it; each feature removal is checked by boolean containment, and verification
+    uses the unmodified import so defeaturing cannot hide a collision.
 
