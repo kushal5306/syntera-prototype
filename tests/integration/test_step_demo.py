@@ -38,6 +38,7 @@ def test_step_obstacle_demo_routes_and_reports_import(tmp_path, vessel_step):
         "route.json",
         "assurance_report.json",
         "route_preview.png",
+        "metrics.json",
         "import_report.json",
         "fea",
     } == {path.name for path in output.iterdir()}

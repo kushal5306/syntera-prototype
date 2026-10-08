@@ -222,6 +222,31 @@ class ImportReport(StrictModel):
     obstacles: list[StepImportSummary]
 
 
+class PipingMetrics(StrictModel):
+    """Centreline quantities of the routed main line; bends are exact circular arcs."""
+
+    main_length_mm: float
+    straight_length_mm: float
+    bend_length_mm: float
+    straights: int
+    bends: int
+
+
+class PackageMetrics(StrictModel):
+    """Size of the modelled package: the axis-aligned envelope of every exact solid."""
+
+    envelope_min_mm: Point3
+    envelope_max_mm: Point3
+    envelope_dimensions_mm: Point3
+    envelope_volume_m3: float
+    footprint_m2: float
+    height_mm: float
+    frame_dimensions_mm: Point3
+    frame_volume_m3: float
+    included_parts: list[str]
+    piping: PipingMetrics | None
+
+
 class AssuranceReport(StrictModel):
     route_found: bool
     route_length_mm: float | None

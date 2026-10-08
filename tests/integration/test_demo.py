@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from syntera.analysis.calculix import DECK_FORMAT_VERSION
 from syntera.cli import run_demo
 
@@ -17,12 +19,23 @@ def test_demo_generates_assured_outputs(tmp_path):
         "route.json",
         "assurance_report.json",
         "route_preview.png",
+        "metrics.json",
         "fea",
     }
     assert expected == {path.name for path in output.iterdir()}
     report = json.loads((output / "assurance_report.json").read_text(encoding="utf-8"))
     assert report["overall_pass"] is True
     assert report["failure_reasons"] == []
+
+    metrics = json.loads((output / "metrics.json").read_text(encoding="utf-8"))
+    assert metrics["piping"]["main_length_mm"] == pytest.approx(report["route_length_mm"], abs=1e-3)
+    assert metrics["piping"]["bends"] == report["number_of_bends"]
+    workspace = [600, 400, 300]
+    assert all(low >= 0 for low in metrics["envelope_min_mm"])
+    assert all(
+        high <= limit for high, limit in zip(metrics["envelope_max_mm"], workspace, strict=True)
+    )
+    assert metrics["envelope_volume_m3"] < metrics["frame_volume_m3"]
 
     manifest = json.loads((output / "fea" / "fea_manifest.json").read_text(encoding="utf-8"))
     assert manifest["generated"] is True

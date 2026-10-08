@@ -65,8 +65,9 @@ function analyse(run) {
   const box = new THREE.Box3();
   run.meshes.forEach((m) => { box.expandByPoint(new THREE.Vector3(...m.bounds.min)); box.expandByPoint(new THREE.Vector3(...m.bounds.max)); });
   if (solvedFea(run)) run.fea.nodes.forEach((n) => box.expandByPoint(new THREE.Vector3(...n)));
-  const size = box.getSize(new THREE.Vector3());
-  const out = { path, envelope: { size, volumeL: size.x * size.y * size.z / 1e6, footprintM2: size.x * size.y / 1e6 } };
+  // Prefer the server's exact B-rep envelope (metrics.json); fall back to display bounds.
+  const size = run.metrics ? new THREE.Vector3(...run.metrics.envelope_dimensions_mm) : box.getSize(new THREE.Vector3());
+  const out = { path, envelope: { size, volumeL: size.x * size.y * size.z / 1e6, footprintM2: size.x * size.y / 1e6, exact: Boolean(run.metrics) } };
   if (solvedFea(run)) {
     const f = run.fea, allow = f.manifest.allowable_von_mises_mpa, limit = f.manifest.maximum_displacement_mm;
     const centroids = f.elements.map((e) => { const c = new THREE.Vector3(); for (let k = 0; k < 4; k++) c.add(new THREE.Vector3(...f.nodes[e[k]])); return c.multiplyScalar(0.25); });
