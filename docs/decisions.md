@@ -12,4 +12,11 @@
 6. **Fail closed.** Invalid configuration, no path, or CAD construction failure returns
    a diagnostic and a failing assurance report rather than questionable geometry.
 7. **Proprietary licence.** All rights reserved; see `LICENSE`. No open-source licence is granted.
+8. **Shell FEA of the tube wall.** S8R mid-surface shells capture hoop stress and
+   bend ovalization that beam elements would hide, while staying a structured,
+   dependency-free mesh. Solid meshing waits for robust STEP import.
+9. **One deck per load case.** Independent steps avoid CalculiX load carry-over
+   between steps and keep each acceptance result traceable to one input file.
+10. **Acceptance outside the solver.** Thresholds live in the validated schema and are
+    checked by deterministic Python against parsed results; missing results fail.
 
