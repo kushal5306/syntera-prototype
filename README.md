@@ -63,11 +63,22 @@ ruff format --check .
 python -m syntera.cli web --config examples/demo_skid.yaml --output outputs/web
 ```
 
-Open <http://127.0.0.1:8000>. The browser application can orbit, pan, zoom,
-show/hide and inspect assembly components, edit tube/port/obstacle inputs, generate
-a route, review exact assurance results, and download the generated STEP and JSON
-artifacts. The browser receives display meshes only; all routing and safety checks
-remain in the deterministic Python core.
+Open <http://127.0.0.1:8000>. The route workbench shows a status strip (verdict, main
+piping length, bends, clearance margin, peak stress utilisation, package envelope), the
+3D model, and tabs for assurance checks, stress, route geometry, run comparison, inputs,
+and review. Each generated run stays in the run bar so inputs can be compared side by side.
+
+When CalculiX (`ccx`) is installed on the server, every run also solves its FEA decks.
+The model can then be coloured by von Mises stress or displacement per load case, with
+an adjustable deformation scale, a pin on the peak, and a table of critical regions
+grouped by route segment. The review tab times expert review for the KPI 1 time study
+(stored in the browser only). The browser receives display data only; all routing,
+safety checks, and FEA acceptance remain in the deterministic Python core, and a run
+whose decks could not be solved is shown as failing.
+
+Keyboard: `1`-`4` views, `F` fit, `X` x-ray, `S` stress, `P` flow, `[` `]` previous or
+next run. three.js r128 (MIT, `static/vendor/three.LICENSE`) is vendored so the
+container works offline; web fonts fall back to system fonts when offline.
 
 The demo writes `assembly.step`, `routed_assembly.step`, `route.json`,
 `assurance_report.json`, and `route_preview.png`. Outputs are intentionally
@@ -127,7 +138,7 @@ and includes path length, turn, proximity, and enforced port-direction costs whi
 retaining collision, clearance, direction, and bend feasibility as hard constraints.
 The compressed route becomes tangent straights and exact circular arcs, swept into a
 solid tube. A separate OpenCascade pass tests solid intersection and shape distance.
-FastAPI exposes that same pipeline to a dependency-free WebGL browser interface.
+FastAPI exposes that same pipeline, plus solved CalculiX fields, to a three.js browser workbench.
 See [docs/architecture.md](docs/architecture.md) for detail.
 
 ## Assurance scope and limitations
