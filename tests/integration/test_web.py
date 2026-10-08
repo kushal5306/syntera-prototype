@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -17,6 +18,8 @@ def test_web_app_previews_routes_and_serves_outputs(tmp_path):
         "engine": "deterministic",
     }
     assert "Syntera" in client.get("/").text
+    assert client.get("/assets/vendor/three.min.js").status_code == 200
+    assert client.get("/api/capabilities").json() == {"calculix": shutil.which("ccx") is not None}
     config = client.get("/api/config").json()
 
     preview = client.post("/api/preview", json=config)
@@ -30,6 +33,20 @@ def test_web_app_previews_routes_and_serves_outputs(tmp_path):
     assert payload["assurance"]["overall_pass"] is True
     assert payload["meshes"][-1]["id"] == "routed-tube"
     assert payload["route"]["found"] is True
+    assert payload["config"]["tube"] == config["tube"]
+    fea = payload["fea"]
+    assert fea["manifest"]["generated"] is True
+    if shutil.which("ccx"):
+        assert fea["solved"] is True
+        assert fea["acceptance"]["overall_pass"] is True
+        assert len(fea["nodes"]) == fea["manifest"]["mesh"]["nodes"]
+        assert len(fea["elements"]) == fea["manifest"]["mesh"]["elements"]
+        for case in fea["cases"]:
+            assert len(case["stress"]) == len(fea["elements"])
+            assert max(case["stress"]) > 0
+    else:
+        assert fea["solved"] is False
+        assert "not installed" in fea["diagnostic"]
     downloads = {item["name"] for item in payload["downloads"]}
     assert "routed_assembly.step" in downloads
     step = client.get("/api/download/routed_assembly.step")

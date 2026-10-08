@@ -18,7 +18,7 @@ YAML -> Pydantic schemas -> analytical CAD + inflated occupancy
         (if assured) S8R shell mesh -> CalculiX decks + manifest
                               |
                               v
-               FastAPI -> tessellated display meshes -> WebGL UI
+               FastAPI -> display meshes + solved FEA fields -> three.js workbench
 ```
 
 STEP obstacles are imported once per file revision. The exact solids feed CAD export and

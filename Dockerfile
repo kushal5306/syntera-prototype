@@ -15,6 +15,7 @@ RUN apt-get update \
         libsm6 \
         libxext6 \
         libxrender1 \
+        calculix-ccx \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

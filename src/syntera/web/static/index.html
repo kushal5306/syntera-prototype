@@ -2,112 +2,79 @@
 <html lang="en">
   <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Syntera - Route Engineering</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Syntera Route Workbench</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
     <link rel="stylesheet" href="/assets/styles.css">
   </head>
   <body>
-    <header class="topbar">
-      <div class="brand">
-        <span class="brand-mark">S</span>
-        <div><strong>Syntera</strong><span>Route Engineering</span></div>
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><rect x="1" y="1" width="32" height="32" rx="6" fill="var(--accent)"/><path d="M8 24 h7 a4 4 0 0 0 4 -4 v-6 a4 4 0 0 1 4 -4 h3" fill="none" stroke="var(--accent-ink)" stroke-width="3" stroke-linecap="round"/><circle cx="8" cy="24" r="2.4" fill="var(--accent-ink)"/><circle cx="26" cy="10" r="2.4" fill="var(--accent-ink)"/></svg>
+      <div><b>Syntera</b><span>Route workbench</span></div>
+    </div>
+    <nav class="scenarios" id="scenarios" aria-label="Design runs"></nav>
+    <div class="spacer"></div>
+    <div class="mode-chip" id="mode-chip"><i></i><span>Connecting to the Syntera server…</span></div>
+    <button class="btn primary" id="run-btn" title="Routing runs on the Syntera server">Generate route</button>
+  </header>
+
+  <section class="kpis" id="kpis" aria-label="Design summary"></section>
+
+  <main class="main">
+    <aside class="panel">
+      <div class="panel-head"><h2>Assembly</h2><button class="btn" id="show-all" style="padding:3px 8px;font-size:12px">Show all</button></div>
+      <div class="scroll"><ul class="tree" id="tree"></ul></div>
+      <div class="props" id="props"><span class="label">Selection</span><h3>Nothing selected</h3><p class="note">Click a part in the model or in this list.</p></div>
+      <div class="hint">
+        <span>Drag to orbit, right-drag or Shift-drag to pan, scroll to zoom</span>
+        <span><kbd>1</kbd>–<kbd>4</kbd> views · <kbd>F</kbd> fit · <kbd>X</kbd> x-ray · <kbd>S</kbd> stress · <kbd>P</kbd> flow · <kbd>[</kbd><kbd>]</kbd> runs</span>
       </div>
-      <div class="topbar-status">
-        <span class="deterministic-badge"><i></i> Deterministic core</span>
-        <span id="status-text">Loading assembly...</span>
+    </aside>
+
+    <section class="viewport" id="viewport" aria-label="3D model">
+      <canvas id="canvas"></canvas>
+      <div id="pins"></div>
+      <div class="busy" id="busy" hidden><span></span>Routing, verifying exact CAD and solving FEA…</div>
+      <div class="vp-tools">
+        <div class="seg" role="group" aria-label="Camera">
+          <button data-view="iso" aria-pressed="true">Iso</button><button data-view="top" aria-pressed="false">Top</button><button data-view="front" aria-pressed="false">Front</button><button data-view="right" aria-pressed="false">Side</button><button id="fit" aria-pressed="false">Fit</button>
+        </div>
+        <div class="seg" role="group" aria-label="Display">
+          <button data-shade="solid" aria-pressed="true">Solid</button><button data-shade="stress" aria-pressed="false">Stress</button><button data-shade="disp" aria-pressed="false">Displacement</button>
+        </div>
+        <div class="seg" role="group" aria-label="Load case" id="case-seg"><select id="case-select" aria-label="Load case"></select></div>
+        <div class="seg" role="group" aria-label="Overlays">
+          <button id="tg-xray" aria-pressed="false">X-ray</button><button id="tg-env" aria-pressed="true">Clearance</button><button id="tg-flow" aria-pressed="true">Flow</button>
+        </div>
       </div>
-      <button class="primary" id="generate-button">Generate solution</button>
-    </header>
-    <main class="workspace">
-      <aside class="panel assembly-panel">
-        <div class="panel-heading">
-          <div><span class="eyebrow">MODEL</span><h2>Assembly</h2></div>
-          <button class="icon-button" id="show-all-button" title="Show all components">O</button>
-        </div>
-        <div id="object-list" class="object-list"></div>
-        <div class="selection-card" id="selection-card">
-          <span class="eyebrow">SELECTION</span>
-          <strong>No component selected</strong>
-          <p>Select an item to inspect its engineering properties.</p>
-        </div>
-        <div class="help-card">
-          <strong>Viewport controls</strong>
-          <span>Drag to orbit / Shift-drag to pan</span>
-          <span>Scroll to zoom / Click to inspect</span>
-        </div>
-      </aside>
-      <section class="viewport-shell">
-        <canvas id="cad-canvas" aria-label="Interactive 3D CAD viewport"></canvas>
-        <div class="viewport-toolbar">
-          <button data-view="iso" class="active">ISO</button>
-          <button data-view="top">TOP</button>
-          <button data-view="front">FRONT</button>
-          <button data-view="right">RIGHT</button>
-          <button id="fit-button" title="Fit geometry">FIT</button>
-        </div>
-        <div class="axis-widget">
-          <span class="x">X</span><span class="y">Y</span><span class="z">Z</span>
-        </div>
-        <div id="viewport-message" class="viewport-message hidden"></div>
-        <div class="viewport-caption">
-          <span id="triangle-count">0 triangles</span><span>Dimensions in mm</span>
-        </div>
-      </section>
-      <aside class="panel engineering-panel">
-        <div class="panel-heading">
-          <div><span class="eyebrow">INPUT</span><h2>Route definition</h2></div>
-          <button class="text-button" id="reset-button">Reset</button>
-        </div>
-        <div class="scroll-panel">
-          <section class="form-section">
-            <h3>Tube specification</h3>
-            <div class="field-grid">
-              <label>Outer diameter <span>mm</span><input id="outer-diameter" type="number" min="0" step="1"></label>
-              <label>Min. clearance <span>mm</span><input id="clearance" type="number" min="0" step="1"></label>
-              <label>Bend radius <span>mm</span><input id="bend-radius" type="number" min="0" step="1"></label>
-              <label>Voxel resolution <span>mm</span><input id="resolution" type="number" min="0" step="1"></label>
-            </div>
-          </section>
-          <section class="form-section">
-            <h3><i class="port-dot start"></i> Start port</h3>
-            <div class="point-grid">
-              <label>X<input id="start-x" type="number"></label>
-              <label>Y<input id="start-y" type="number"></label>
-              <label>Z<input id="start-z" type="number"></label>
-            </div>
-            <label class="wide-label">Direction<select id="start-direction"></select></label>
-          </section>
-          <section class="form-section">
-            <h3><i class="port-dot end"></i> End port</h3>
-            <div class="point-grid">
-              <label>X<input id="end-x" type="number"></label>
-              <label>Y<input id="end-y" type="number"></label>
-              <label>Z<input id="end-z" type="number"></label>
-            </div>
-            <label class="wide-label">Direction<select id="end-direction"></select></label>
-          </section>
-          <section class="form-section">
-            <div class="section-title"><h3>Obstacles</h3><span>Synthetic JSON</span></div>
-            <textarea id="obstacles" spellcheck="false"></textarea>
-            <button class="secondary full" id="update-button">Update assembly preview</button>
-          </section>
-          <section class="assurance-section" id="assurance-section">
-            <div class="assurance-title">
-              <div><span class="eyebrow">VERIFICATION</span><h3>Assurance</h3></div>
-              <span class="result-badge neutral" id="result-badge">NOT RUN</span>
-            </div>
-            <div class="metric-grid" id="metric-grid">
-              <div><span>Route</span><strong>-</strong></div>
-              <div><span>Collision</span><strong>-</strong></div>
-              <div><span>Clearance</span><strong>-</strong></div>
-              <div><span>Bends</span><strong>-</strong></div>
-            </div>
-            <div id="failure-reasons" class="failure-reasons hidden"></div>
-            <div id="downloads" class="downloads"></div>
-          </section>
-        </div>
-      </aside>
-    </main>
-    <script type="module" src="/assets/app.js"></script>
+      <div class="legend" id="legend" hidden></div>
+      <div class="vp-foot">
+        <span id="tri-count" class="num"></span>
+        <label class="scale" id="deform-wrap" hidden>Deformation ×<input id="deform" type="range" min="0" max="400" step="10" value="150"><span id="deform-val" class="num">150</span></label>
+        <span>mm · Z up</span>
+      </div>
+    </section>
+
+    <aside class="panel analysis">
+      <div class="tabs" role="tablist" id="tabs">
+        <button role="tab" data-tab="assurance" aria-selected="true">Assurance</button>
+        <button role="tab" data-tab="fea" aria-selected="false">Stress</button>
+        <button role="tab" data-tab="route" aria-selected="false">Route</button>
+        <button role="tab" data-tab="compare" aria-selected="false">Compare</button>
+        <button role="tab" data-tab="spec" aria-selected="false">Spec</button>
+        <button role="tab" data-tab="review" aria-selected="false">Review</button>
+      </div>
+      <div class="scroll"><div class="tabpanel" id="tabpanel"></div></div>
+    </aside>
+  </main>
+
+  <footer class="titleblock" id="titleblock"></footer>
+</div>
+    <script src="/assets/vendor/three.min.js"></script>
+    <script src="/assets/app.js"></script>
   </body>
 </html>
