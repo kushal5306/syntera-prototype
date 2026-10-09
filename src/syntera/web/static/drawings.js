@@ -208,7 +208,7 @@ async function show(drawingId) {
   state.mark = null;
   $("drop").hidden = true;
   $("stage").hidden = false;
-  $("sheet-img").src = `/api/drawings/${drawingId}/drawing.svg`;
+  $("sheet-img").src = `/api/drawings/${drawingId}/drawing.svg?v=${s.render_version}`;
   renderDetails(s);
   document.querySelectorAll("#drawing-list li").forEach((li) => li.setAttribute("aria-selected", String(li.dataset.id === drawingId)));
   history.replaceState(null, "", `/drawings#${drawingId}`);
