@@ -72,3 +72,5 @@ class DrawingSummary(DrawingModel):
     truncated: bool
     audit_errors: int
     audit_fixes: int
+    # Records written before render versions existed are version 1 (dark background).
+    render_version: int = 1

@@ -9,7 +9,7 @@ from pathlib import Path
 
 import ezdxf
 from ezdxf import bbox, recover, units
-from ezdxf.addons.drawing import Frontend, RenderContext, layout, svg
+from ezdxf.addons.drawing import Frontend, RenderContext, config, layout, svg
 from ezdxf.document import Drawing
 from ezdxf.math import BoundingBox2d
 
@@ -22,6 +22,13 @@ from syntera.drawings.models import (
 )
 
 MAX_NOTES = 500
+# Bump when the SVG rendering changes so stored drawings are re-rendered on next access.
+RENDER_VERSION = 2
+PAPER = "#ffffff"
+# Drawing colours are darkened until they reach this contrast ratio against white paper,
+# so white, yellow and cyan CAD colours stay legible (WCAG 2.1 non-text contrast).
+MIN_CONTRAST = 3.0
+HEX_COLOUR = re.compile(r"#[0-9a-fA-F]{6}\b")
 # An entity is clipped from the default view when it alone is this many times larger than
 # everything else together (typically a stray or mis-scaled block far from the drawing).
 OUTLIER_RATIO = 10.0
@@ -164,16 +171,48 @@ def notes(doc: Drawing) -> tuple[list[DimensionNote], list[TextNote], bool]:
     return dimensions, texts, truncated
 
 
+def _luminance(rgb: tuple[float, float, float]) -> float:
+    linear = [c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4 for c in rgb]
+    return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
+
+
+def legible_on_paper(colour: str) -> str:
+    """Darken ``colour`` (#rrggbb) just enough to reach ``MIN_CONTRAST`` on white."""
+    rgb = tuple(int(colour[i : i + 2], 16) / 255 for i in (1, 3, 5))
+    factor = 1.0
+    while (1.05 / (_luminance(tuple(c * factor for c in rgb)) + 0.05)) < MIN_CONTRAST:
+        factor -= 0.02
+    if factor == 1.0:
+        return colour.lower()
+    return "#" + "".join(f"{round(c * factor * 255):02x}" for c in rgb)
+
+
+def _recolour_styles(document: str) -> str:
+    """Apply ``legible_on_paper`` to every entity colour class; the page rect stays white."""
+    end = document.index("</defs>")
+    styles = HEX_COLOUR.sub(lambda match: legible_on_paper(match.group(0)), document[:end])
+    return styles + document[end:]
+
+
 def render_svg(doc: Drawing, view: BoundingBox2d) -> str:
-    """Render model space to SVG on a dark CAD background, framed on ``view``."""
+    """Render model space as dark lines on white paper, framed on ``view``."""
     if not view.has_data:
         raise DrawingError(
             "model space has no drawable geometry (paper-space-only drawings are not supported)"
         )
     backend = svg.SVGBackend()
-    Frontend(RenderContext(doc), backend).draw_layout(doc.modelspace(), finalize=True)
+    paper = config.Configuration(
+        background_policy=config.BackgroundPolicy.CUSTOM,
+        custom_bg_color=PAPER,
+        lineweight_policy=config.LineweightPolicy.RELATIVE,
+    )
+    Frontend(RenderContext(doc), backend, config=paper).draw_layout(doc.modelspace(), finalize=True)
     page = layout.Page(0, 0, layout.Units.mm, layout.Margins.all(4), max_width=1189, max_height=841)
-    return backend.get_string(page, render_box=view, xml_declaration=False)
+    # Line widths scale with the sheet (heaviest 0.2% of its size); the thinnest lines are
+    # kept at half of that so they stay visible when the whole sheet is in view.
+    settings = layout.Settings(max_stroke_width=0.002, min_stroke_width=0.5)
+    document = backend.get_string(page, settings=settings, render_box=view, xml_declaration=False)
+    return _recolour_styles(document)
 
 
 def svg_page_mm(document: str) -> tuple[float, float]:
@@ -209,6 +248,7 @@ def read_drawing(path: Path) -> dict:
         "truncated": truncated,
         "audit_errors": audit_errors,
         "audit_fixes": audit_fixes,
+        "render_version": RENDER_VERSION,
         "svg_page_mm": svg_page_mm(document),
         "svg": document,
     }

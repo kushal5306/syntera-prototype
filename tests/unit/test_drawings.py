@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -9,7 +10,14 @@ import ezdxf
 import pytest
 
 from syntera.drawings.convert import DrawingError, available_converters, convert_dwg, dwg_version
-from syntera.drawings.intake import SUMMARY_FILE, SVG_FILE, ingest_drawing, source_format
+from syntera.drawings.intake import (
+    SUMMARY_FILE,
+    SVG_FILE,
+    ingest_drawing,
+    refresh_drawing,
+    source_format,
+)
+from syntera.drawings.reader import MIN_CONTRAST, RENDER_VERSION, legible_on_paper
 
 
 def pump_dxf(path: Path, outlier: bool = False) -> Path:
@@ -95,6 +103,51 @@ def test_dxf_summary_reports_units_layers_dimensions_and_notes(tmp_path):
     assert low_x <= 0 and high_x >= 600 and low_y <= -50 and high_y >= 420
     folder = tmp_path / "store" / summary.drawing_id
     assert (folder / SVG_FILE).read_text(encoding="utf-8").startswith("<svg")
+
+
+def _contrast_on_white(colour: str) -> float:
+    rgb = [int(colour[i : i + 2], 16) / 255 for i in (1, 3, 5)]
+    linear = [c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4 for c in rgb]
+    luminance = 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
+    return 1.05 / (luminance + 0.05)
+
+
+def test_light_cad_colours_are_darkened_for_white_paper():
+    assert legible_on_paper("#000000") == "#000000"
+    assert legible_on_paper("#800000") == "#800000"
+    for light in ("#ffffff", "#ffff00", "#00ffff", "#c0c0c0"):
+        darker = legible_on_paper(light)
+        assert darker != light
+        assert MIN_CONTRAST <= _contrast_on_white(darker) < MIN_CONTRAST + 0.3
+
+
+def test_svg_is_white_paper_with_legible_line_colours(tmp_path):
+    source = pump_dxf(tmp_path / "pump.dxf")
+    summary = ingest_drawing(source.read_bytes(), "pump.dxf", tmp_path / "store")
+    document = (tmp_path / "store" / summary.drawing_id / SVG_FILE).read_text(encoding="utf-8")
+    assert '<rect fill="#ffffff"' in document
+    defs = document[: document.index("</defs>")]
+    colours = set(re.findall(r"#[0-9a-f]{6}", defs))
+    assert colours
+    assert all(_contrast_on_white(colour) >= MIN_CONTRAST for colour in colours)
+    assert summary.render_version == RENDER_VERSION
+
+
+def test_records_from_an_older_renderer_are_re_rendered(tmp_path):
+    data = pump_dxf(tmp_path / "pump.dxf").read_bytes()
+    summary = ingest_drawing(data, "pump.dxf", tmp_path / "store")
+    folder = tmp_path / "store" / summary.drawing_id
+    stale = json.loads((folder / SUMMARY_FILE).read_text(encoding="utf-8"))
+    del stale["render_version"]
+    (folder / SUMMARY_FILE).write_text(json.dumps(stale), encoding="utf-8")
+    (folder / SVG_FILE).write_text("<svg>old</svg>", encoding="utf-8")
+
+    refresh_drawing(tmp_path / "store", summary.drawing_id)
+
+    refreshed = json.loads((folder / SUMMARY_FILE).read_text(encoding="utf-8"))
+    assert refreshed["render_version"] == RENDER_VERSION
+    assert refreshed["filename"] == "pump.dxf"
+    assert (folder / SVG_FILE).read_text(encoding="utf-8").startswith("<svg xmlns")
 
 
 def test_ingest_is_deterministic_and_content_addressed(tmp_path):

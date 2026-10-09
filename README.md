@@ -139,7 +139,9 @@ application only opens STEP files named in its server-side configuration.
 
 Open <http://127.0.0.1:8000/drawings> (or **Drawings** in the workbench header) and drop a
 `.dwg` or `.dxf` file, up to 50 MB. The server converts DWG to DXF, reads it with ezdxf,
-and renders model space as an SVG you can pan and zoom (scroll, drag, Fit). The side panel
+and renders model space as an SVG you can pan and zoom (scroll, drag, Fit). Drawings are
+shown as on paper: a white sheet, with white, yellow and other light CAD colours darkened
+just enough to stay readable. The side panel
 lists what was read: DWG release, converter, units, layers, dimension values, and text notes
 (click a note to find it on the sheet). The same can be produced offline:
 

@@ -18,6 +18,7 @@ from syntera.drawings.intake import (
     SVG_FILE,
     ingest_drawing,
     list_drawings,
+    refresh_drawing,
 )
 
 DRAWING_FILES = {
@@ -78,6 +79,11 @@ def drawings_router(root: Path) -> APIRouter:
     def drawing_file(drawing_id: str, name: str) -> FileResponse:
         if not DRAWING_ID.match(drawing_id) or name not in DRAWING_FILES:
             raise HTTPException(status_code=404, detail="unknown drawing output")
+        with lock:
+            try:
+                refresh_drawing(root, drawing_id)
+            except DrawingError as error:
+                raise HTTPException(status_code=422, detail=str(error)) from error
         target = root / drawing_id / name
         if not target.is_file():
             raise HTTPException(status_code=404, detail="drawing has not been processed")

@@ -10,7 +10,7 @@ from pathlib import Path
 
 from syntera.drawings.convert import DWG_RELEASES, DrawingError, convert_dwg, dwg_version
 from syntera.drawings.models import DrawingSummary
-from syntera.drawings.reader import read_drawing
+from syntera.drawings.reader import RENDER_VERSION, read_drawing
 
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024
 SUMMARY_FILE = "summary.json"
@@ -46,7 +46,8 @@ def ingest_drawing(data: bytes, filename: str, root: Path) -> DrawingSummary:
     """Convert (if DWG), read and render one drawing under ``root/<drawing_id>``.
 
     The id is derived from the file content, so re-uploading the same file reuses the
-    existing record and the outputs are identical for identical input.
+    existing record (re-rendered if it predates ``RENDER_VERSION``) and the outputs are
+    identical for identical input.
     """
     if not data:
         raise DrawingError("the uploaded file is empty")
@@ -56,7 +57,11 @@ def ingest_drawing(data: bytes, filename: str, root: Path) -> DrawingSummary:
     digest = hashlib.sha256(data).hexdigest()
     folder = root / digest[:16]
     if (folder / SUMMARY_FILE).is_file():
-        return load_summary(folder)
+        summary = load_summary(folder)
+        if summary.render_version == RENDER_VERSION:
+            return summary
+        filename = summary.filename
+        shutil.rmtree(folder)
     folder.mkdir(parents=True, exist_ok=True)
     try:
         return _process(data, filename, kind, digest, folder)
@@ -95,6 +100,18 @@ def _process(data: bytes, filename: str, kind: str, digest: str, folder: Path) -
         encoding="utf-8",
     )
     return summary
+
+
+def refresh_drawing(root: Path, drawing_id: str) -> None:
+    """Re-render a stored drawing from its saved source if it predates ``RENDER_VERSION``."""
+    folder = root / drawing_id
+    if not (folder / SUMMARY_FILE).is_file():
+        return
+    summary = load_summary(folder)
+    if summary.render_version == RENDER_VERSION:
+        return
+    source = folder / f"source.{summary.source_format}"
+    ingest_drawing(source.read_bytes(), summary.filename, root)
 
 
 def list_drawings(root: Path) -> list[DrawingSummary]:
