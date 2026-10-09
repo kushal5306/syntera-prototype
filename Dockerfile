@@ -43,6 +43,7 @@ RUN apt-get update \
         libxext6 \
         libxrender1 \
         calculix-ccx \
+        fonts-dejavu-core \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=libredwg /opt/libredwg /opt/libredwg
