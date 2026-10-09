@@ -81,8 +81,14 @@ next run. three.js r128 (MIT, `static/vendor/three.LICENSE`) is vendored so the
 container works offline; web fonts fall back to system fonts when offline.
 
 The demo writes `assembly.step`, `routed_assembly.step`, `route.json`,
-`assurance_report.json`, and `route_preview.png`. Outputs are intentionally
-ignored by Git.
+`assurance_report.json`, `route_preview.png`, and `layout.dxf`. Outputs are
+intentionally ignored by Git.
+
+`layout.dxf` is a general-arrangement drawing in millimetres: plan, front elevation and
+right elevation (third-angle) of the equipment, the nozzles and the routed tube drawn
+along its exact tangent/arc centreline at its outer diameter, with overall dimensions
+and a title block that repeats the assurance verdict. It is a review deliverable, not
+evidence. In the web app, **Open layout in Drawings** sends it to the drawing viewer.
 
 ### CalculiX analysis decks
 

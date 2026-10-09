@@ -7,6 +7,7 @@ import pytest
 
 from syntera.analysis.calculix import DECK_FORMAT_VERSION
 from syntera.cli import run_demo
+from syntera.drawings.intake import ingest_drawing
 
 
 def test_demo_generates_assured_outputs(tmp_path):
@@ -20,6 +21,7 @@ def test_demo_generates_assured_outputs(tmp_path):
         "assurance_report.json",
         "route_preview.png",
         "metrics.json",
+        "layout.dxf",
         "fea",
     }
     assert expected == {path.name for path in output.iterdir()}
@@ -48,3 +50,14 @@ def test_demo_generates_assured_outputs(tmp_path):
         "mesh.inp",
         *(f"{case}.inp" for case in cases),
     }
+
+    layout = ingest_drawing(
+        (output / "layout.dxf").read_bytes(), "layout.dxf", tmp_path / "drawings"
+    )
+    assert layout.units.name == "Millimeters"
+    assert sorted(dim.measurement for dim in layout.dimensions) == [300, 300, 400, 400, 600, 600]
+    notes = {note.text for note in layout.texts}
+    assert "ASSURANCE (EXACT GEOMETRY CHECKS): PASS" in notes
+    assert (
+        f"ROUTE LENGTH {report['route_length_mm']:.1f}   BENDS {report['number_of_bends']}" in notes
+    )
