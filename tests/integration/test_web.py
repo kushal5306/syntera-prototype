@@ -58,3 +58,42 @@ def test_web_app_rejects_unknown_download(tmp_path):
     project_root = Path(__file__).parents[2]
     client = TestClient(create_app(project_root / "examples" / "demo_skid.yaml", tmp_path / "web"))
     assert client.get("/api/download/not-a-file.step").status_code == 404
+
+
+def test_web_app_uploads_and_serves_a_drawing(tmp_path):
+    import ezdxf
+
+    project_root = Path(__file__).parents[2]
+    client = TestClient(create_app(project_root / "examples" / "demo_skid.yaml", tmp_path / "web"))
+    doc = ezdxf.new()
+    doc.units = ezdxf.units.MM
+    doc.modelspace().add_line((0, 0), (250, 0), dxfattribs={"layer": "PIPE"})
+    source = tmp_path / "line.dxf"
+    doc.saveas(source)
+
+    assert "Drawings" in client.get("/").text
+    assert "Upload DWG or DXF" in client.get("/drawings").text
+    capabilities = client.get("/api/drawings/capabilities").json()
+    converter = shutil.which("ODAFileConverter") or shutil.which("dwg2dxf")
+    assert capabilities["dwg"] is (converter is not None)
+    assert client.get("/api/drawings").json() == []
+
+    uploaded = client.post("/api/drawings?filename=line.dxf", content=source.read_bytes())
+    assert uploaded.status_code == 200
+    summary = uploaded.json()
+    assert summary["entity_types"] == {"LINE": 1}
+    drawing_id = summary["drawing_id"]
+    assert client.get("/api/drawings").json() == [
+        {"drawing_id": drawing_id, "filename": "line.dxf", "source_format": "dxf"}
+    ]
+    svg = client.get(f"/api/drawings/{drawing_id}/drawing.svg")
+    assert svg.status_code == 200
+    assert svg.headers["content-type"].startswith("image/svg+xml")
+    assert client.get(f"/api/drawings/{drawing_id}/summary.json").json() == summary
+    assert client.get(f"/api/drawings/{drawing_id}/drawing.dxf").status_code == 200
+
+    rejected = client.post("/api/drawings?filename=notes.dwg", content=b"not a drawing")
+    assert rejected.status_code == 422
+    assert "not a DWG" in rejected.json()["detail"]
+    assert client.get(f"/api/drawings/{drawing_id}/source.dxf").status_code == 404
+    assert client.get("/api/drawings/../../etc/drawing.svg").status_code == 404

@@ -42,3 +42,20 @@ jobs:
           done
           docker logs syntera-ci
           exit 1
+      - name: Convert and read a real DWG through the running container
+        run: |
+          curl --fail --location --silent --show-error --output example_2018.dwg \
+            https://raw.githubusercontent.com/LibreDWG/libredwg/0.13.3/test/test-data/example_2018.dwg
+          curl --fail --silent --show-error http://127.0.0.1:8000/api/drawings/capabilities \
+            | python3 -c "import json, sys; assert json.load(sys.stdin)['dwg'] is True"
+          status=$(curl --silent --show-error --output drawing.json --write-out '%{http_code}' \
+            --data-binary @example_2018.dwg --header "Content-Type: application/octet-stream" \
+            "http://127.0.0.1:8000/api/drawings?filename=example_2018.dwg")
+          if [ "$status" != 200 ]; then
+            echo "Upload returned HTTP $status:"; cat drawing.json; echo
+            docker cp example_2018.dwg syntera-ci:/tmp/sample.dwg
+            docker exec syntera-ci dwg2dxf -y -o /tmp/sample.dxf /tmp/sample.dwg || true
+            docker logs syntera-ci | tail -50
+            exit 1
+          fi
+          python3 -c "import json; s = json.load(open('drawing.json')); assert s['conversion']['converter'] == 'libredwg' and s['entity_count'] > 0 and s['dimensions'], s"

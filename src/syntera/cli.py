@@ -52,6 +52,20 @@ def run_fea_evaluate(config_path: Path, output: Path) -> int:
     return 0 if report.overall_pass else 2
 
 
+def run_drawing(source: Path, output: Path) -> int:
+    """Convert (if DWG), read and render one drawing into ``output/<drawing_id>``."""
+    from syntera.drawings.intake import SUMMARY_FILE, ingest_drawing
+
+    summary = ingest_drawing(source.read_bytes(), source.name, output)
+    folder = output / summary.drawing_id
+    via = summary.conversion.converter if summary.conversion else "read directly"
+    print(f"Drawing: {summary.filename} ({summary.source_format.upper()}, {via})")
+    print(f"Entities: {summary.entity_count}; units: {summary.units.name}")
+    print(f"Dimensions: {len(summary.dimensions)}; text notes: {len(summary.texts)}")
+    print(f"Summary: {folder / SUMMARY_FILE}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="syntera", description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -63,6 +77,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     evaluate.add_argument("--config", type=Path, required=True)
     evaluate.add_argument("--output", type=Path, required=True)
+    drawing = subparsers.add_parser(
+        "drawing", help="convert a DWG/DXF drawing to DXF, an SVG view and a JSON summary"
+    )
+    drawing.add_argument("--input", type=Path, required=True)
+    drawing.add_argument("--output", type=Path, default=Path("outputs/drawings"))
     web = subparsers.add_parser("web", help="launch the interactive 3D application")
     web.add_argument("--config", type=Path, default=Path("examples/demo_skid.yaml"))
     web.add_argument("--output", type=Path, default=Path("outputs/web"))
@@ -78,6 +97,8 @@ def main(argv: list[str] | None = None) -> int:
             return run_demo(args.config, args.output)
         if args.command == "fea-evaluate":
             return run_fea_evaluate(args.config, args.output)
+        if args.command == "drawing":
+            return run_drawing(args.input, args.output)
         if args.command == "web":
             import uvicorn
 

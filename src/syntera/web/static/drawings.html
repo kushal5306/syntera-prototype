@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Syntera Drawings</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+    <link rel="stylesheet" href="/assets/styles.css">
+    <link rel="stylesheet" href="/assets/drawings.css">
+  </head>
+  <body>
+<div class="app drawings-app">
+  <header class="topbar">
+    <div class="brand">
+      <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><rect x="1" y="1" width="32" height="32" rx="6" fill="var(--accent)"/><path d="M8 24 h7 a4 4 0 0 0 4 -4 v-6 a4 4 0 0 1 4 -4 h3" fill="none" stroke="var(--accent-ink)" stroke-width="3" stroke-linecap="round"/><circle cx="8" cy="24" r="2.4" fill="var(--accent-ink)"/><circle cx="26" cy="10" r="2.4" fill="var(--accent-ink)"/></svg>
+      <div><b>Syntera</b><span>Drawings</span></div>
+    </div>
+    <div class="spacer"></div>
+    <div class="mode-chip" id="converter-chip"><i></i><span>Checking DWG support…</span></div>
+    <a class="btn" href="/">Route workbench</a>
+    <label class="btn primary upload-btn">Upload DWG or DXF<input id="file-input" type="file" accept=".dwg,.dxf" hidden></label>
+  </header>
+
+  <main class="drawings-main">
+    <aside class="panel">
+      <div class="panel-head"><h2>Drawings</h2></div>
+      <div class="scroll"><ul class="tree" id="drawing-list"></ul></div>
+      <p class="note list-note" id="list-note">Uploaded drawings stay on this Syntera server.</p>
+    </aside>
+
+    <section class="viewport sheet" id="sheet" aria-label="Drawing">
+      <div class="drop" id="drop">
+        <b>Drop a DWG or DXF here</b>
+        <span>or use Upload. DWG is converted to DXF on the server, then drawn as vectors.</span>
+      </div>
+      <div class="sheet-stage" id="stage" hidden>
+        <img id="sheet-img" alt="Rendered drawing" draggable="false">
+        <div id="sheet-pins"></div>
+      </div>
+      <div class="busy" id="busy" hidden><span></span>Converting and reading the drawing…</div>
+      <div class="vp-tools">
+        <div class="seg" role="group" aria-label="Zoom">
+          <button id="zoom-in" aria-pressed="false" aria-label="Zoom in">+</button><button id="zoom-out" aria-pressed="false" aria-label="Zoom out">−</button><button id="zoom-fit" aria-pressed="false">Fit</button>
+        </div>
+      </div>
+      <div class="vp-foot"><span id="cursor" class="num"></span><span id="units-foot"></span></div>
+    </section>
+
+    <aside class="panel analysis">
+      <div class="panel-head"><h2>What Syntera read</h2></div>
+      <div class="scroll"><div class="tabpanel" id="details"><p class="note">Upload a drawing to see its layers, dimensions and notes.</p></div></div>
+    </aside>
+  </main>
+</div>
+    <script src="/assets/drawings.js"></script>
+  </body>
+</html>

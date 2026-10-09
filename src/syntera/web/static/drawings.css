@@ -1,0 +1,31 @@
+/* Drawings page: drawing list | 2D sheet | what was read. Reuses the workbench tokens. */
+.drawings-app { grid-template-rows: auto minmax(0, 1fr); height: 100vh; min-height: 640px; }
+.drawings-main { display: grid; grid-template-columns: 240px minmax(0, 1fr) 380px; gap: 12px; min-height: 0; }
+.upload-btn { cursor: pointer; }
+.list-note { padding: 10px 14px; border-top: 1px solid var(--line); }
+.tree li.drawing-item { grid-template-columns: auto 1fr; }
+.tree li.drawing-item b { font: 600 10px var(--font-display); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+
+.sheet { cursor: grab; touch-action: none; user-select: none; }
+.sheet.panning { cursor: grabbing; }
+.sheet.dragover { outline: 2px dashed var(--accent); outline-offset: -8px; }
+.sheet-stage { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+.sheet-stage img { display: block; width: 100%; height: 100%; }
+#sheet-pins { position: absolute; inset: 0; }
+.mark { position: absolute; width: 18px; height: 18px; margin: -9px 0 0 -9px; border: 2px solid var(--warn); border-radius: 50%; box-shadow: 0 0 0 3px rgb(0 0 0 / .35); }
+.drop { position: absolute; inset: 0; display: grid; place-content: center; gap: 6px; text-align: center; padding: 24px; color: var(--muted); }
+.drop b { font: 600 20px var(--font-display); color: var(--ink); }
+.warnings { margin: 0; padding-left: 18px; font: 11px/1.4 var(--font-mono); color: var(--muted); overflow-wrap: anywhere; }
+.reason.soft { background: var(--warn-soft); color: var(--warn); }
+.cell-text { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+@media (max-width: 1180px) {
+  .drawings-main { grid-template-columns: 220px minmax(0, 1fr); }
+  .drawings-app { height: auto; }
+  .drawings-main .sheet { min-height: 70vh; }
+  .drawings-main > .analysis { grid-column: 1 / -1; }
+}
+@media (max-width: 760px) {
+  .drawings-main { grid-template-columns: 1fr; }
+  .drawings-main .sheet { min-height: 62vh; order: -1; }
+}

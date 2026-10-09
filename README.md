@@ -129,6 +129,37 @@ the exact assurance checks always run against the unmodified imported geometry. 
 writes `import_report.json` with the source SHA-256, feature counts, and volumes. The web
 application only opens STEP files named in its server-side configuration.
 
+### Viewing DWG and DXF drawings
+
+Open <http://127.0.0.1:8000/drawings> (or **Drawings** in the workbench header) and drop a
+`.dwg` or `.dxf` file, up to 50 MB. The server converts DWG to DXF, reads it with ezdxf,
+and renders model space as an SVG you can pan and zoom (scroll, drag, Fit). The side panel
+lists what was read: DWG release, converter, units, layers, dimension values, and text notes
+(click a note to find it on the sheet). The same can be produced offline:
+
+```bash
+python -m syntera.cli drawing --input path/to/plan.dwg --output outputs/drawings
+```
+
+Each drawing is stored under `<output>/drawings/<id>/` with `drawing.dxf`, `drawing.svg`, and
+`summary.json`; the id is the first 16 hex digits of the file's SHA-256, so the same file
+always gives the same record.
+
+DWG is a closed format, so conversion uses an external program, chosen in this order:
+
+- **ODA File Converter** (`ODAFileConverter` on `PATH`): the most faithful reader. It is free
+  to download from the Open Design Alliance but is not open source, so it is never bundled;
+  install it yourself if its licence suits your use.
+- **LibreDWG** `dwg2dxf` (GPLv3): built into the Docker image from the pinned GNU release and
+  run as a separate program. Reads R13 to AutoCAD 2018 drawings well. Custom objects, ACIS
+  solids, and some newer entities can be skipped; converter messages are shown with the
+  drawing so missing content is visible. LibreDWG's DWG writer is not used.
+
+Without either converter, DXF uploads still work and DWG uploads fail with an explanation.
+The rendered view is for review, not a measurement: fonts and linetypes are approximated,
+and entities far outside the drawing (for example, a mis-scaled block) are left out of the
+default view and listed. Units come from `$INSUNITS`; unitless drawings are flagged.
+
 ## Architecture
 
 Pydantic validates an explicitly millimetre-based input. CadQuery creates synthetic
@@ -160,6 +191,8 @@ See [docs/architecture.md](docs/architecture.md) for detail.
   the run, fatigue, and code-based stress classification are not modelled.
 - Peak von Mises includes clamp-edge stress concentrations, which is conservative.
   Mesh-convergence studies are not yet automated.
+- Drawing intake reads model space only; paper-space layouts, xrefs, and 3D solids in
+  DWG/DXF files are not interpreted, and nothing read from a drawing feeds routing yet.
 - This research prototype is not certified for production or safety-critical use.
 
 ## Next milestones
