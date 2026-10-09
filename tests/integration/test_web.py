@@ -52,6 +52,12 @@ def test_web_app_previews_routes_and_serves_outputs(tmp_path):
     step = client.get("/api/download/routed_assembly.step")
     assert step.status_code == 200
     assert b"ISO-10303-21" in step.content[:100]
+    assert "layout.dxf" in downloads
+    layout = client.get("/api/download/layout.dxf")
+    assert layout.status_code == 200
+    drawing = client.post("/api/drawings?filename=syntera-layout.dxf", content=layout.content)
+    assert drawing.status_code == 200
+    assert len(drawing.json()["dimensions"]) == 6
 
 
 def test_web_app_rejects_unknown_download(tmp_path):

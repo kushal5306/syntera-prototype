@@ -385,7 +385,7 @@ const TABS = {
       ${reasons.length ? reasons.map((r) => `<div class="reason">${esc(r[0].toUpperCase() + r.slice(1))}.</div>`).join("") : ""}
       <ul class="checks">${items.map(([name, ok, detail, u]) => `<li class="check ${ok ? "ok" : "bad"}"><span class="ico">${ok ? "✓" : "✕"}</span><span><b>${esc(name)}</b><small>${esc(detail)}</small></span>${u != null ? `<span class="meter" title="utilisation ${fmt(u * 100, 0)}%"><i style="width:${Math.min(100, u * 100)}%;background:${utilColor(u)}"></i></span>` : "<span></span>"}</li>`).join("")}</ul>
       <p class="note">Every check is deterministic and runs on the exact CAD geometry. The preview never counts as evidence.</p>
-      ${run.downloads?.length ? `<div class="section-title"><h3>Files</h3><span class="note">latest run only</span></div><div class="row">${run.downloads.map((f) => `<a class="btn" href="${esc(f.url)}" download="${esc(f.name)}">${esc(f.name)}</a>`).join("")}</div>` : ""}`;
+      ${run.downloads?.length ? `<div class="section-title"><h3>Files</h3><span class="note">latest run only</span></div><div class="row">${run.downloads.map((f) => `<a class="btn" href="${esc(f.url)}" download="${esc(f.name)}">${esc(f.name)}</a>`).join("")}${run.downloads.some((f) => f.name === "layout.dxf") ? `<button class="btn" data-open-layout title="Open the plan and elevations in the drawing viewer">Open layout in Drawings</button>` : ""}</div>` : ""}`;
   },
   fea(run) {
     const d = run.derived.fea;
@@ -534,6 +534,24 @@ function profileSvg(path) {
   return `<svg class="profile" viewBox="0 0 ${W} ${H}" role="img" aria-label="Route elevation profile" style="font:10px var(--font-mono);fill:var(--muted)">${bends}${ticksY}<path d="${d}" fill="none" stroke="var(--accent)" stroke-width="2"/>${ticksX}</svg><p class="note">Shaded bands are bends.</p>`;
 }
 
+/* Hand the latest run's layout DXF to the drawing viewer through its ordinary upload route. */
+async function openLayout(button) {
+  button.disabled = true;
+  try {
+    const dxf = await fetch("/api/download/layout.dxf");
+    if (!dxf.ok) throw new Error(`layout download failed (${dxf.status})`);
+    const r = await fetch("/api/drawings?filename=syntera-layout.dxf", {
+      method: "POST", headers: { "Content-Type": "application/octet-stream" }, body: await dxf.blob(),
+    });
+    const body = await r.json();
+    if (!r.ok) throw new Error(body.detail || r.statusText);
+    location.href = `/drawings#${body.drawing_id}`;
+  } catch (error) {
+    button.disabled = false;
+    button.textContent = `Could not open layout: ${error.message}`;
+  }
+}
+
 function renderTab() {
   document.querySelectorAll("#tabs button").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === state.tab)));
   const run = RUNS[state.run];
@@ -541,6 +559,7 @@ function renderTab() {
   $("#tabpanel").innerHTML = TABS[state.tab](run);
   document.querySelectorAll("[data-case]").forEach((r) => r.addEventListener("click", () => setCase(+r.dataset.case)));
   document.querySelectorAll("[data-goto]").forEach((r) => r.addEventListener("click", () => setRun(+r.dataset.goto)));
+  document.querySelectorAll("[data-open-layout]").forEach((b) => b.addEventListener("click", () => openLayout(b)));
   document.querySelectorAll("[data-region-elem]").forEach((r) => r.addEventListener("click", () => {
     const f = run.fea, e = f.elements[+r.dataset.regionElem], c = new THREE.Vector3();
     for (let k = 0; k < 4; k++) c.add(new THREE.Vector3(...f.nodes[e[k]]));

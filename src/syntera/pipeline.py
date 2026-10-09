@@ -12,6 +12,7 @@ import cadquery as cq
 from syntera.analysis.calculix import write_fea_inputs
 from syntera.geometry.cad import assembly_shapes, export_step, make_tube
 from syntera.geometry.step_import import import_step_obstacle
+from syntera.reporting.layout_dxf import write_layout_dxf
 from syntera.reporting.metrics import package_metrics
 from syntera.reporting.output import write_json, write_preview
 from syntera.routing.astar import AStarRouter
@@ -57,6 +58,7 @@ def execute_pipeline(
         "route_preview.png",
         "import_report.json",
         "metrics.json",
+        "layout.dxf",
     ):
         (output / filename).unlink(missing_ok=True)
     shutil.rmtree(output / "fea", ignore_errors=True)
@@ -93,6 +95,7 @@ def execute_pipeline(
         export_step([*assembly, tube], output / "routed_assembly.step")
         report = verify_route(config, route, tube, started_at)
     write_json(report, output / "assurance_report.json")
+    write_layout_dxf(config, route, report, output / "layout.dxf")
     metrics = package_metrics(config, assembly, tube, route.points)
     write_json(metrics, output / "metrics.json")
     fea = None

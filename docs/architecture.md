@@ -41,6 +41,9 @@ direction alignment.
 
 The web layer calls the same pipeline as the CLI. It may visualize tessellated
 meshes and collect typed inputs, but it cannot issue an assurance pass itself.
+`layout.dxf` projects the same configuration and centreline into plan and elevation
+views after verification; it restates the report's verdict and never contributes to it.
+
 Download endpoints expose only a fixed allowlist beneath the configured output
 directory.
 

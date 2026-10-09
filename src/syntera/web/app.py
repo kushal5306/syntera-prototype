@@ -29,6 +29,7 @@ DOWNLOADS = {
     "route_preview.png",
     "import_report.json",
     "metrics.json",
+    "layout.dxf",
 }
 
 
