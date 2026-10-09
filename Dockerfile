@@ -1,3 +1,30 @@
+# LibreDWG (GPLv3) provides dwg2dxf for DWG intake. It is built from the pinned, checksummed
+# GNU release and runs as a separate program; Syntera never links against it.
+FROM python:3.11-slim-bookworm AS libredwg
+
+ARG LIBREDWG_VERSION=0.13.3
+ARG LIBREDWG_SHA256=83f1f6e78a744777a481ff4520e4cef3f8ac4b2c1c25671077ca12fe81e8816e
+
+RUN apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        build-essential \
+        ca-certificates \
+        curl \
+        xz-utils \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+RUN curl --fail --location --silent --show-error \
+        --output libredwg.tar.xz \
+        "https://github.com/LibreDWG/libredwg/releases/download/${LIBREDWG_VERSION}/libredwg-${LIBREDWG_VERSION}.tar.xz" \
+    && echo "${LIBREDWG_SHA256}  libredwg.tar.xz" | sha256sum --check - \
+    && tar -xf libredwg.tar.xz \
+    && cd "libredwg-${LIBREDWG_VERSION}" \
+    && ./configure --prefix=/opt/libredwg --disable-bindings --disable-static \
+    && make -j"$(nproc)" \
+    && make install \
+    && cp COPYING /opt/libredwg/COPYING
+
 FROM python:3.11-slim-bookworm
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -17,6 +44,12 @@ RUN apt-get update \
         libxrender1 \
         calculix-ccx \
     && rm -rf /var/lib/apt/lists/*
+
+COPY --from=libredwg /opt/libredwg /opt/libredwg
+RUN ln -s /opt/libredwg/bin/dwg2dxf /usr/local/bin/dwg2dxf \
+    && echo /opt/libredwg/lib > /etc/ld.so.conf.d/libredwg.conf \
+    && ldconfig \
+    && dwg2dxf --version
 
 WORKDIR /app
 

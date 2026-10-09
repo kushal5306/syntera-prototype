@@ -11,6 +11,8 @@ dist/
 outputs/
 *.step
 *.stp
+*.dwg
+*.dxf
 .env
 .env.*
 !.env.example

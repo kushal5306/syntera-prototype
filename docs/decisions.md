@@ -22,4 +22,7 @@
 11. **Material-only defeaturing.** Simplifying imported geometry may add material but never
     remove it; each feature removal is checked by boolean containment, and verification
     uses the unmodified import so defeaturing cannot hide a collision.
-
+12. **DWG through an external converter.** DWG is read only by converting it to DXF with a
+    separate program (ODA File Converter when installed, else LibreDWG), never by linking
+    a DWG library. This keeps GPL and proprietary converter code out of the Syntera process,
+    records which converter produced each DXF, and lets a deployment swap converters.

@@ -44,6 +44,19 @@ meshes and collect typed inputs, but it cannot issue an assurance pass itself.
 Download endpoints expose only a fixed allowlist beneath the configured output
 directory.
 
+## Drawing intake
+
+`syntera.drawings` is a separate path for 2D drawings and does not feed routing yet:
+
+```text
+upload (.dwg/.dxf) -> header check -> [DWG] external converter -> DXF
+    -> ezdxf recover/audit -> summary.json (units, layers, dimensions, notes)
+                           -> drawing.svg (model space, outliers clipped from view)
+```
+
+Records are content-addressed by SHA-256 under `<output>/drawings/`, written in full or
+removed on failure, and served by `/api/drawings` from a fixed file allowlist.
+
 ## Analysis decks
 
 `syntera.analysis` runs only after the route passes assurance. It rebuilds the same

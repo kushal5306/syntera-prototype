@@ -18,6 +18,7 @@ from syntera.geometry.cad import assembly_shapes
 from syntera.geometry.step_import import StepImportError
 from syntera.pipeline import PipelineResult, execute_pipeline
 from syntera.schemas import DemoConfig, StepObstacle
+from syntera.web.drawings import drawings_router
 from syntera.web.mesh import scene_meshes
 
 DOWNLOADS = {
@@ -80,6 +81,7 @@ def create_app(config_path: Path, output_root: Path) -> FastAPI:
     lock = Lock()
     app = FastAPI(title="Syntera interactive prototype", version="0.2.0")
     app.mount("/assets", StaticFiles(directory=static), name="assets")
+    app.include_router(drawings_router(output_root / "drawings"))
 
     def checked(config: DemoConfig) -> DemoConfig:
         """Only STEP files named by the server-side config may be opened from a request."""
@@ -94,6 +96,10 @@ def create_app(config_path: Path, output_root: Path) -> FastAPI:
     @app.get("/", include_in_schema=False)
     def index() -> FileResponse:
         return FileResponse(static / "index.html")
+
+    @app.get("/drawings", include_in_schema=False)
+    def drawings_page() -> FileResponse:
+        return FileResponse(static / "drawings.html")
 
     @app.get("/api/health")
     def health() -> dict[str, str]:
