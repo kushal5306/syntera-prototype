@@ -86,6 +86,24 @@ def run_drawing_check(source: Path, output: Path, options_json: str | None) -> i
     return 0 if report.supported else 2
 
 
+def run_pid_3d(source: Path, output: Path) -> int:
+    """Propose a 3D plant layout for a DEXPI P&ID and route every line."""
+    from syntera.pid.build import REPORT_FILE, build_plant
+    from syntera.pid.dexpi import read_dexpi
+
+    document = read_dexpi(source.read_bytes(), source.name)
+    folder = output / document.source_sha256[:16] / "plant"
+    report = build_plant(document, folder).report
+    print(f"P&ID: {report.filename}: {len(report.equipment)} equipment item(s)")
+    print(f"Lines routed and verified: {report.routed} of {len(report.routes)}")
+    print(f"Total pipe: {report.total_pipe_length_mm / 1000:.1f} m, {report.total_bends} bends")
+    for route in report.routes:
+        if not route.routed:
+            print(f"- not routed: line {route.line} ({'; '.join(route.failure_reasons)})")
+    print(f"Report: {folder / REPORT_FILE}")
+    return 0 if report.failed == 0 else 2
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="syntera", description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -112,6 +130,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--options",
         help="JSON assembly options, e.g. '{\"equipment_height_mm\": 1200}'",
     )
+    pid = subparsers.add_parser(
+        "pid-3d", help="propose a 3D plant layout from a DEXPI XML P&ID and route every line"
+    )
+    pid.add_argument("--input", type=Path, required=True)
+    pid.add_argument("--output", type=Path, default=Path("outputs/pid"))
     web = subparsers.add_parser("web", help="launch the interactive 3D application")
     web.add_argument("--config", type=Path, default=Path("examples/demo_skid.yaml"))
     web.add_argument("--output", type=Path, default=Path("outputs/web"))
@@ -129,6 +152,8 @@ def main(argv: list[str] | None = None) -> int:
             return run_fea_evaluate(args.config, args.output)
         if args.command == "drawing":
             return run_drawing(args.input, args.output)
+        if args.command == "pid-3d":
+            return run_pid_3d(args.input, args.output)
         if args.command == "drawing-check":
             return run_drawing_check(args.input, args.output, args.options)
         if args.command == "web":

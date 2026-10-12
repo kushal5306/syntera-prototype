@@ -48,3 +48,5 @@
 .check-section summary { cursor: pointer; font-size: 12px; color: var(--muted); margin-top: 6px; }
 .row.wrap { flex-wrap: wrap; }
 #check-result { display: grid; gap: 12px; margin-top: 10px; }
+.line-label { font-size: 11px; max-width: 220px; overflow-wrap: anywhere; }
+.analysis .scroll { overflow-x: hidden; }
