@@ -42,7 +42,11 @@ ROLE_WORDS: tuple[tuple[LayerRole, tuple[str, ...]], ...] = (
     ("pipe_centreline", ("PIPE-CL", "PIPE_CL", "PIPECL", "CENTRELINE", "CENTERLINE")),
     ("nozzle", ("NOZZLE", "NOZ", "PORT", "CONNECTION")),
     ("pipe", ("PIPE", "PIPING", "TUBE")),
-    ("equipment", ("EQUIP", "VESSEL", "TANK", "PUMP", "COMPRESSOR", "EXCHANGER", "FILTER")),
+    # EQPM is the US National CAD Standard equipment code (M-EQPM, P-EQPM).
+    (
+        "equipment",
+        ("EQUIP", "EQPM", "VESSEL", "TANK", "PUMP", "COMPRESSOR", "EXCHANGER", "FILTER"),
+    ),
     ("frame", ("FRAME", "BORDER", "WORKSPACE", "SKID")),
 )
 SCHEMATIC_WORDS = re.compile(r"P\s*&\s*ID|P&AMP;ID|PIPING AND INSTRUMENT|PFD|FLOW DIAGRAM")
@@ -383,14 +387,19 @@ def infer_layout(
             for label, present in (("equipment", "equipment" in roles), ("pipe", has_pipes))
             if not present
         ]
-        reason = (
-            "This looks like a P&ID or other schematic. It shows how lines connect, not where "
-            "equipment and pipes sit, so it cannot define a 3D assembly."
-            if schematic or not roles
-            else "Syntera could not find "
-            + " or ".join(f"{label} geometry" for label in missing)
-            + " on this drawing."
-        )
+        if schematic:
+            reason = (
+                "This looks like a P&ID or other schematic. It shows how lines connect, not "
+                "where equipment and pipes sit, so it cannot define a 3D assembly."
+            )
+        elif not roles:
+            reason = "Syntera found no layers named like equipment or piping on this drawing."
+        else:
+            reason = (
+                "Syntera could not find "
+                + " or ".join(f"{label} geometry" for label in missing)
+                + " on this drawing."
+            )
         return InferredLayout(
             supported=False,
             message=reason

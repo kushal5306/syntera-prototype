@@ -17,7 +17,14 @@ from syntera.drawings.intake import (
     refresh_drawing,
     source_format,
 )
-from syntera.drawings.reader import MIN_CONTRAST, RENDER_VERSION, legible_on_paper
+from syntera.drawings.reader import (
+    MAX_SHEET_HEIGHT_MM,
+    MAX_SHEET_WIDTH_MM,
+    MIN_CONTRAST,
+    MIN_SHEET_MM,
+    RENDER_VERSION,
+    legible_on_paper,
+)
 
 
 def pump_dxf(path: Path, outlier: bool = False) -> Path:
@@ -131,6 +138,30 @@ def test_svg_is_white_paper_with_legible_line_colours(tmp_path):
     assert colours
     assert all(_contrast_on_white(colour) >= MIN_CONTRAST for colour in colours)
     assert summary.render_version == RENDER_VERSION
+
+
+def test_small_drawings_get_a_readable_sheet(tmp_path):
+    # A 2-inch part: 2 drawing units would otherwise give a sheet mostly made of margins.
+    doc = ezdxf.new("R2018")
+    doc.units = ezdxf.units.IN
+    doc.modelspace().add_circle((0, 0), 1)
+    path = tmp_path / "gear.dxf"
+    doc.saveas(path)
+    summary = ingest_drawing(path.read_bytes(), "gear.dxf", tmp_path / "store")
+    width, height = summary.svg_page_mm
+    assert max(width, height) >= MIN_SHEET_MM
+    assert width == pytest.approx(height, rel=0.01)
+
+
+def test_large_drawings_are_capped_at_a0(tmp_path):
+    doc = ezdxf.new("R2018")
+    doc.modelspace().add_lwpolyline([(0, 0), (40000, 0), (40000, 9000)])
+    path = tmp_path / "plant.dxf"
+    doc.saveas(path)
+    summary = ingest_drawing(path.read_bytes(), "plant.dxf", tmp_path / "store")
+    width, height = summary.svg_page_mm
+    assert width == pytest.approx(MAX_SHEET_WIDTH_MM)
+    assert height <= MAX_SHEET_HEIGHT_MM
 
 
 def test_records_from_an_older_renderer_are_re_rendered(tmp_path):
