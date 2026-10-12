@@ -173,6 +173,7 @@ function renderDetails(s) {
       ["DWG release", s.dwg_version || "–"],
       ["Converter", s.conversion ? `${s.conversion.converter}${s.conversion.converter_version ? ` (${s.conversion.converter_version})` : ""}` : "none (DXF read directly)"],
       ["Units", units],
+      ["Shown", !s.space || s.space === "Model" ? "Model space" : `Paper space: ${s.space} (model space draws nothing)`],
       ["Drawing size", extentText],
       ["Entities", fmt(s.entity_count, 0)],
       ["SHA-256", s.source_sha256.slice(0, 16) + "…"],

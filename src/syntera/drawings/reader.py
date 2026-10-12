@@ -11,6 +11,7 @@ import ezdxf
 from ezdxf import bbox, recover, units
 from ezdxf.addons.drawing import Frontend, RenderContext, config, layout, svg
 from ezdxf.document import Drawing
+from ezdxf.layouts import BaseLayout
 from ezdxf.math import BoundingBox2d
 
 from syntera.drawings.convert import DrawingError
@@ -23,12 +24,19 @@ from syntera.drawings.models import (
 
 MAX_NOTES = 500
 # Bump when the SVG rendering changes so stored drawings are re-rendered on next access.
-RENDER_VERSION = 3
+RENDER_VERSION = 4
 PAPER = "#ffffff"
 # Drawing colours are darkened until they reach this contrast ratio against white paper,
 # so white, yellow and cyan CAD colours stay legible (WCAG 2.1 non-text contrast).
 MIN_CONTRAST = 3.0
 HEX_COLOUR = re.compile(r"#[0-9a-fA-F]{6}\b")
+# Any drawn element; ezdxf's SVG backend writes geometry and text as paths.
+DRAWN_ELEMENT = re.compile(r"<(path|polyline|polygon|line|circle|ellipse|image)\b")
+NOTHING_DRAWN = (
+    "Syntera could not draw anything from this drawing: model space and paper space have no "
+    "visible geometry. If it came from a DWG, the converter may not have decoded its objects; "
+    "try exporting a DXF from the CAD program that made it."
+)
 # An entity is clipped from the default view when it alone is this many times larger than
 # everything else together (typically a stray or mis-scaled block far from the drawing).
 OUTLIER_RATIO = 10.0
@@ -83,11 +91,13 @@ def _extents(box: BoundingBox2d) -> Extents | None:
     return ((round(low.x, 6), round(low.y, 6)), (round(high.x, 6), round(high.y, 6)))
 
 
-def view_box(doc: Drawing) -> tuple[BoundingBox2d, BoundingBox2d, list[str]]:
-    """Full model-space extents, the default view extents, and handles clipped from view."""
+def view_box(
+    space: BaseLayout, clip_outliers: bool = True
+) -> tuple[BoundingBox2d, BoundingBox2d, list[str]]:
+    """Full extents of ``space``, the default view extents, and handles clipped from view."""
     cache = bbox.Cache()
     boxes: list[tuple[str, BoundingBox2d]] = []
-    for entity in doc.modelspace():
+    for entity in space:
         box = bbox.extents([entity], fast=False, cache=cache)
         if box.has_data:
             boxes.append((entity.dxf.handle, BoundingBox2d([box.extmin.vec2, box.extmax.vec2])))
@@ -96,7 +106,7 @@ def view_box(doc: Drawing) -> tuple[BoundingBox2d, BoundingBox2d, list[str]]:
         full.extend([box.extmin, box.extmax])
     by_size = sorted(range(len(boxes)), key=lambda i: (-boxes[i][1].size.magnitude, i))
     clipped: set[int] = set()
-    for index in by_size[:MAX_OUTLIERS]:
+    for index in by_size[: MAX_OUTLIERS if clip_outliers else 0]:
         rest = BoundingBox2d()
         for other, (_, box) in enumerate(boxes):
             if other != index and other not in clipped:
@@ -140,12 +150,12 @@ def _measurement(dimension) -> float | None:
     return round(float(value.magnitude), 6)
 
 
-def notes(doc: Drawing) -> tuple[list[DimensionNote], list[TextNote], bool]:
-    """Dimensions and text in model-space order, capped at ``MAX_NOTES`` each."""
+def notes(space: BaseLayout) -> tuple[list[DimensionNote], list[TextNote], bool]:
+    """Dimensions and text in drawing order, capped at ``MAX_NOTES`` each."""
     dimensions: list[DimensionNote] = []
     texts: list[TextNote] = []
     truncated = False
-    for entity in doc.modelspace():
+    for entity in space:
         kind = entity.dxftype()
         if kind == "DIMENSION":
             if len(dimensions) >= MAX_NOTES:
@@ -195,7 +205,9 @@ def legible_on_paper(colour: str) -> str:
 
 def _recolour_styles(document: str) -> str:
     """Apply ``legible_on_paper`` to every entity colour class; the page rect stays white."""
-    end = document.index("</defs>")
+    end = document.find("</defs>")
+    if end < 0:  # ezdxf writes a self-closing <defs /> when nothing was styled
+        return document
     styles = HEX_COLOUR.sub(lambda match: legible_on_paper(match.group(0)), document[:end])
     return styles + document[end:]
 
@@ -215,25 +227,41 @@ def sheet_page(view: BoundingBox2d) -> layout.Page:
     )
 
 
-def render_svg(doc: Drawing, view: BoundingBox2d) -> str:
-    """Render model space as dark lines on white paper, framed on ``view``."""
+def render_svg(doc: Drawing, space: BaseLayout, view: BoundingBox2d) -> str | None:
+    """Render ``space`` as dark lines on white paper, framed on ``view``; None if nothing shows."""
     if not view.has_data:
-        raise DrawingError(
-            "model space has no drawable geometry (paper-space-only drawings are not supported)"
-        )
+        return None
     backend = svg.SVGBackend()
     paper = config.Configuration(
         background_policy=config.BackgroundPolicy.CUSTOM,
         custom_bg_color=PAPER,
         lineweight_policy=config.LineweightPolicy.RELATIVE,
     )
-    Frontend(RenderContext(doc), backend, config=paper).draw_layout(doc.modelspace(), finalize=True)
+    Frontend(RenderContext(doc), backend, config=paper).draw_layout(space, finalize=True)
     page = sheet_page(view)
     # Line widths scale with the sheet (heaviest 0.2% of its size); the thinnest lines are
     # kept at half of that so they stay visible when the whole sheet is in view.
     settings = layout.Settings(max_stroke_width=0.002, min_stroke_width=0.5)
     document = backend.get_string(page, settings=settings, render_box=view, xml_declaration=False)
+    if not DRAWN_ELEMENT.search(document, document.find("</defs>") + 1 or 0):
+        return None
     return _recolour_styles(document)
+
+
+def _rendered_space(doc: Drawing) -> tuple[BaseLayout, tuple, str]:
+    """Model space if it draws anything, else the first paper-space layout that does."""
+    spaces = [doc.modelspace()] + [
+        doc.layouts.get(name) for name in doc.layouts.names_in_taborder() if name != "Model"
+    ]
+    if not any(len(space) for space in spaces):
+        raise DrawingError("model space has no drawable geometry")
+    for space in spaces:
+        # A paper sheet's border is meant to frame everything, so it is never an outlier.
+        boxes = view_box(space, clip_outliers=space.is_modelspace)
+        document = render_svg(doc, space, boxes[1])
+        if document is not None:
+            return space, boxes, document
+    raise DrawingError(NOTHING_DRAWN)
 
 
 def svg_page_mm(document: str) -> tuple[float, float]:
@@ -247,14 +275,13 @@ def svg_page_mm(document: str) -> tuple[float, float]:
 def read_drawing(path: Path) -> dict:
     """Everything the summary needs from one DXF file, plus its SVG."""
     doc, audit_errors, audit_fixes = load_dxf(path)
-    msp = doc.modelspace()
-    types = Counter(entity.dxftype() for entity in msp)
-    per_layer = Counter(entity.dxf.layer for entity in msp)
-    inserts = Counter(entity.dxf.name for entity in msp.query("INSERT"))
-    full, view, clipped = view_box(doc)
-    dimensions, texts, truncated = notes(doc)
-    document = render_svg(doc, view)
+    space, (full, view, clipped), document = _rendered_space(doc)
+    types = Counter(entity.dxftype() for entity in space)
+    per_layer = Counter(entity.dxf.layer for entity in space)
+    inserts = Counter(entity.dxf.name for entity in space.query("INSERT"))
+    dimensions, texts, truncated = notes(space)
     return {
+        "space": space.name,
         "dxf_version": doc.dxfversion,
         "units": drawing_units(doc),
         "extents": _extents(full),

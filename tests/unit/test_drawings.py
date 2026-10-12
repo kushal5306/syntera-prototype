@@ -23,6 +23,7 @@ from syntera.drawings.reader import (
     MIN_CONTRAST,
     MIN_SHEET_MM,
     RENDER_VERSION,
+    _recolour_styles,
     legible_on_paper,
 )
 
@@ -213,6 +214,44 @@ def test_empty_model_space_fails_closed_and_leaves_no_record(tmp_path):
     with pytest.raises(DrawingError, match="no drawable geometry"):
         ingest_drawing(path.read_bytes(), "empty.dxf", tmp_path / "store")
     assert list((tmp_path / "store").iterdir()) == []
+
+
+def _hidden_model_space(doc) -> None:
+    doc.layers.add("HIDDEN-STUFF").off()
+    doc.modelspace().add_line((0, 0), (10, 0), dxfattribs={"layer": "HIDDEN-STUFF"})
+
+
+def test_paper_space_is_shown_when_model_space_draws_nothing(tmp_path):
+    # Seen with a converted AutoCAD 2007 DWG: model space rendered nothing at all.
+    doc = ezdxf.new("R2018")
+    _hidden_model_space(doc)
+    sheet = doc.layouts.get("Layout1")
+    sheet.add_lwpolyline([(0, 0), (420, 0), (420, 297), (0, 297)], close=True)
+    sheet.add_text("TITLE BLOCK", height=5).set_placement((300, 10))
+    path = tmp_path / "paper.dxf"
+    doc.saveas(path)
+
+    summary = ingest_drawing(path.read_bytes(), "paper.dxf", tmp_path / "store")
+    assert summary.space == "Layout1"
+    assert summary.view_extents == ((0.0, 0.0), (420.0, 297.0))  # border is not clipped
+    assert [note.text for note in summary.texts] == ["TITLE BLOCK"]
+    document = (tmp_path / "store" / summary.drawing_id / SVG_FILE).read_text(encoding="utf-8")
+    assert "<path" in document
+
+
+def test_drawing_with_nothing_visible_fails_with_a_clear_message(tmp_path):
+    doc = ezdxf.new("R2018")
+    _hidden_model_space(doc)
+    path = tmp_path / "hidden.dxf"
+    doc.saveas(path)
+    with pytest.raises(DrawingError, match="could not draw anything"):
+        ingest_drawing(path.read_bytes(), "hidden.dxf", tmp_path / "store")
+    assert list((tmp_path / "store").iterdir()) == []
+
+
+def test_svg_without_styles_is_left_unchanged():
+    document = '<svg><defs /><rect fill="#ffff00" /></svg>'
+    assert _recolour_styles(document) == document
 
 
 def test_dwg_without_converter_explains_how_to_proceed(tmp_path, monkeypatch):

@@ -49,7 +49,8 @@ class TextNote(DrawingModel):
 
 
 class DrawingSummary(DrawingModel):
-    """Deterministic facts read from a drawing's model space, in drawing units."""
+    """Deterministic facts read from the drawing's model space (or, if that draws nothing,
+    its first paper-space layout), in drawing units."""
 
     drawing_id: str
     filename: str
@@ -74,6 +75,8 @@ class DrawingSummary(DrawingModel):
     audit_fixes: int
     # Records written before render versions existed are version 1 (dark background).
     render_version: int = 1
+    # Which layout the summary and SVG describe: "Model", or a paper-space layout name.
+    space: str = "Model"
 
 
 LayerRole = Literal["equipment", "pipe", "pipe_centreline", "nozzle", "frame", "ignore"]
