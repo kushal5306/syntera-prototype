@@ -39,8 +39,13 @@
         <img id="sheet-img" alt="Rendered drawing" draggable="false">
         <div id="sheet-pins"></div>
       </div>
+      <canvas id="model-canvas" hidden aria-label="3D assembly inferred from the drawing"></canvas>
+      <div class="model-legend" id="model-legend" hidden><span><i class="swatch drawn"></i>Pipe as drawn</span><span><i class="swatch syntera"></i>Syntera's verified route</span><span><i class="swatch equip"></i>Equipment</span></div>
       <div class="busy" id="busy" hidden><span></span>Converting and reading the drawing…</div>
       <div class="vp-tools">
+        <div class="seg" role="group" aria-label="View">
+          <button id="mode-2d" aria-pressed="true">2D drawing</button><button id="mode-3d" aria-pressed="false" disabled title="Generate the 3D assembly first">3D assembly</button>
+        </div>
         <div class="seg" role="group" aria-label="Zoom">
           <button id="zoom-in" aria-pressed="false" aria-label="Zoom in">+</button><button id="zoom-out" aria-pressed="false" aria-label="Zoom out">−</button><button id="zoom-fit" aria-pressed="false">Fit</button>
         </div>
@@ -54,6 +59,7 @@
     </aside>
   </main>
 </div>
+    <script src="/assets/vendor/three.min.js"></script>
     <script src="/assets/drawings.js"></script>
   </body>
 </html>

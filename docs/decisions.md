@@ -26,3 +26,7 @@
     separate program (ODA File Converter when installed, else LibreDWG), never by linking
     a DWG library. This keeps GPL and proprietary converter code out of the Syntera process,
     records which converter produced each DXF, and lets a deployment swap converters.
+13. **Drawings become 3D only through stated assumptions.** A plan cannot define heights,
+    so every inferred value carries its source (drawing, default or user) in the piping
+    check report. Unrecognised drawings and schematics are refused rather than guessed,
+    and a route saving is reported only for a Syntera route that passes every exact check.

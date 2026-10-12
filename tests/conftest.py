@@ -92,3 +92,45 @@ def vessel_step(tmp_path: Path) -> Path:
     path = tmp_path / "vessel.step"
     cq.exporters.export(vessel, str(path))
     return path
+
+
+def write_plan_layout(path: Path) -> Path:
+    """Synthetic plan-only skid layout (mm) with a hand-drawn, longer-than-needed pipe run.
+
+    No elevations are drawn, so heights come from defaults. The run leaves the left nozzle,
+    climbs over the top of every item and drops back to the right nozzle, although a
+    shorter route passes between the control panel and the pump.
+    """
+    import ezdxf
+
+    doc = ezdxf.new("R2018")
+    doc.units = ezdxf.units.MM
+    msp = doc.modelspace()
+    for name in ("EQUIP-VESSELS", "PIPING", "NOZZLES", "NOTES"):
+        doc.layers.add(name)
+    msp.add_circle((1800, 1700), 700, dxfattribs={"layer": "EQUIP-VESSELS"})
+    msp.add_text("FEED TANK", dxfattribs={"layer": "NOTES"}).set_placement((1800, 1700))
+    for label, (x, y), (w, h) in (
+        ("TRANSFER PUMP", (3400, 1500), (900, 700)),
+        ("BAG FILTER", (4700, 1900), (600, 600)),
+        ("CONTROL PANEL", (2800, 500), (600, 400)),
+    ):
+        corners = [
+            (x - w / 2, y - h / 2),
+            (x + w / 2, y - h / 2),
+            (x + w / 2, y + h / 2),
+            (x - w / 2, y + h / 2),
+        ]
+        msp.add_lwpolyline(corners, close=True, dxfattribs={"layer": "EQUIP-VESSELS"})
+        msp.add_text(label, dxfattribs={"layer": "NOTES"}).set_placement((x, y))
+    route = [(300, 600), (1000, 600), (1000, 2700), (5000, 2700), (5000, 600), (5700, 600)]
+    msp.add_lwpolyline(route, dxfattribs={"layer": "PIPING"})
+    for point in (route[0], route[-1]):
+        msp.add_circle(point, 30, dxfattribs={"layer": "NOZZLES"})
+    doc.saveas(path)
+    return path
+
+
+@pytest.fixture
+def plan_layout_dxf(tmp_path: Path) -> Path:
+    return write_plan_layout(tmp_path / "plan-layout.dxf")

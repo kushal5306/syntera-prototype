@@ -650,7 +650,10 @@ if (!LIVE) {
   $("#run-btn").title = "Route, verify and solve the current inputs (also in the Spec tab)";
   $("#mode-chip i").style.background = "var(--pass)";
   (async () => {
-    try { serverConfig = await api("/api/config"); await generate(structuredClone(serverConfig)); }
+    // /?drawing=<id>&line=line-1 opens the 3D assembly inferred from an uploaded drawing.
+    const query = new URLSearchParams(location.search), drawing = query.get("drawing");
+    const source = drawing ? `/api/drawings/${encodeURIComponent(drawing)}/assembly/${encodeURIComponent(query.get("line") || "line-1")}/config.json` : "/api/config";
+    try { serverConfig = await api(source); await generate(structuredClone(serverConfig)); }
     catch (error) { $("#mode-chip span").textContent = `Cannot reach the server: ${error.message}`; }
   })();
 }

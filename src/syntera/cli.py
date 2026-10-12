@@ -66,6 +66,26 @@ def run_drawing(source: Path, output: Path) -> int:
     return 0
 
 
+def run_drawing_check(source: Path, output: Path, options_json: str | None) -> int:
+    """Build the 3D assembly from a plan drawing and check its piping as drawn."""
+    from syntera.drawings.intake import DXF_FILE, ingest_drawing
+    from syntera.drawings.models import AssemblyOptions
+    from syntera.drawings.piping_check import ASSEMBLY_DIR, REPORT_FILE, check_drawing
+    from syntera.drawings.reader import load_dxf
+
+    options = AssemblyOptions.model_validate_json(options_json or "{}")
+    summary = ingest_drawing(source.read_bytes(), source.name, output)
+    folder = output / summary.drawing_id
+    doc, _, _ = load_dxf(folder / DXF_FILE)
+    report = check_drawing(doc, summary, folder, options).report
+    print(f"Drawing: {summary.filename}")
+    print(report.message)
+    for finding in report.findings:
+        print(f"- {finding}")
+    print(f"Report: {folder / ASSEMBLY_DIR / REPORT_FILE}")
+    return 0 if report.supported else 2
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="syntera", description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -82,6 +102,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     drawing.add_argument("--input", type=Path, required=True)
     drawing.add_argument("--output", type=Path, default=Path("outputs/drawings"))
+    check = subparsers.add_parser(
+        "drawing-check",
+        help="build a 3D assembly from a plan DWG/DXF and check its piping as drawn",
+    )
+    check.add_argument("--input", type=Path, required=True)
+    check.add_argument("--output", type=Path, default=Path("outputs/drawings"))
+    check.add_argument(
+        "--options",
+        help="JSON assembly options, e.g. '{\"equipment_height_mm\": 1200}'",
+    )
     web = subparsers.add_parser("web", help="launch the interactive 3D application")
     web.add_argument("--config", type=Path, default=Path("examples/demo_skid.yaml"))
     web.add_argument("--output", type=Path, default=Path("outputs/web"))
@@ -99,6 +129,8 @@ def main(argv: list[str] | None = None) -> int:
             return run_fea_evaluate(args.config, args.output)
         if args.command == "drawing":
             return run_drawing(args.input, args.output)
+        if args.command == "drawing-check":
+            return run_drawing_check(args.input, args.output, args.options)
         if args.command == "web":
             import uvicorn
 

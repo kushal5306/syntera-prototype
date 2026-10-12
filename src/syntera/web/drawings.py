@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from threading import Lock
 
@@ -18,14 +19,58 @@ from syntera.drawings.intake import (
     SVG_FILE,
     ingest_drawing,
     list_drawings,
+    load_summary,
     refresh_drawing,
 )
+from syntera.drawings.models import AssemblyOptions
+from syntera.drawings.piping_check import (
+    ASSEMBLY_DIR,
+    LINE_FILES,
+    REPORT_FILE,
+    PipingCheckResult,
+    check_drawing,
+)
+from syntera.drawings.reader import load_dxf
+from syntera.web.mesh import scene_meshes, shape_mesh
 
 DRAWING_FILES = {
     SVG_FILE: "image/svg+xml",
     DXF_FILE: "application/dxf",
     SUMMARY_FILE: "application/json",
 }
+LINE_FOLDER = re.compile(r"^line-[1-9][0-9]?$")
+DRAWN_TUBE_COLOUR = (0.93, 0.62, 0.16)
+
+
+def assembly_meshes(result: PipingCheckResult) -> list[dict]:
+    """Equipment once, then each line's nozzles, drawn tube and Syntera's tube."""
+    meshes: list[dict] = []
+    for index, line in enumerate(result.lines):
+        prefix = f"line-{index + 1}"
+        name = result.report.lines[index].name
+        for mesh in scene_meshes(line.config, line.assembly, line.optimised_tube):
+            if mesh["kind"] == "obstacle" and index:
+                continue
+            if mesh["kind"] != "obstacle":
+                mesh["id"] = f"{prefix}-{mesh['id']}"
+                mesh["name"] = f"{name} {mesh['name'].lower()}"
+                mesh["line"] = index
+            if mesh["kind"] == "route":
+                mesh["name"] = f"{name} Syntera route"
+            meshes.append(mesh)
+        if line.drawn_tube is not None:
+            mesh = shape_mesh(
+                f"{prefix}-drawn-tube",
+                f"{name} as drawn",
+                "drawn",
+                line.drawn_tube,
+                DRAWN_TUBE_COLOUR,
+                {"outer_diameter_mm": line.config.tube.outer_diameter},
+                max(0.8, line.config.voxel_resolution / 8.0),
+            )
+            mesh["line"] = index
+            meshes.append(mesh)
+    return meshes
 
 
 def drawings_router(root: Path) -> APIRouter:
@@ -75,6 +120,44 @@ def drawings_router(root: Path) -> APIRouter:
         except DrawingError as error:
             raise HTTPException(status_code=422, detail=str(error)) from error
 
+    def run_check(drawing_id: str, options: AssemblyOptions) -> dict:
+        folder = root / drawing_id
+        with lock:
+            refresh_drawing(root, drawing_id)
+            summary = load_summary(folder)
+            doc, _, _ = load_dxf(folder / DXF_FILE)
+            result = check_drawing(doc, summary, folder, options)
+        return {
+            "report": result.report.model_dump(mode="json"),
+            "meshes": assembly_meshes(result),
+        }
+
+    @router.post("/{drawing_id}/assembly")
+    async def assembly(drawing_id: str, options: AssemblyOptions) -> dict:
+        if not DRAWING_ID.match(drawing_id) or not (root / drawing_id / SUMMARY_FILE).is_file():
+            raise HTTPException(status_code=404, detail="unknown drawing")
+        try:
+            return await run_in_threadpool(run_check, drawing_id, options)
+        except (DrawingError, ValueError) as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
+
+    @router.get("/{drawing_id}/assembly/{name}")
+    def assembly_report(drawing_id: str, name: str) -> FileResponse:
+        if not DRAWING_ID.match(drawing_id) or name != REPORT_FILE:
+            raise HTTPException(status_code=404, detail="unknown assembly output")
+        return _existing(root / drawing_id / ASSEMBLY_DIR / name, "application/json")
+
+    @router.get("/{drawing_id}/assembly/{line}/{name}")
+    def assembly_file(drawing_id: str, line: str, name: str) -> FileResponse:
+        if (
+            not DRAWING_ID.match(drawing_id)
+            or not LINE_FOLDER.match(line)
+            or name not in LINE_FILES
+        ):
+            raise HTTPException(status_code=404, detail="unknown assembly output")
+        target = root / drawing_id / ASSEMBLY_DIR / line / name
+        return _existing(target, LINE_FILES[name], f"{line}-{name}")
+
     @router.get("/{drawing_id}/{name}")
     def drawing_file(drawing_id: str, name: str) -> FileResponse:
         if not DRAWING_ID.match(drawing_id) or name not in DRAWING_FILES:
@@ -90,3 +173,9 @@ def drawings_router(root: Path) -> APIRouter:
         return FileResponse(target, media_type=DRAWING_FILES[name])
 
     return router
+
+
+def _existing(target: Path, media_type: str, filename: str | None = None) -> FileResponse:
+    if not target.is_file():
+        raise HTTPException(status_code=404, detail="the 3D assembly has not been generated")
+    return FileResponse(target, media_type=media_type, filename=filename)

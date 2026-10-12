@@ -103,3 +103,45 @@ def test_web_app_uploads_and_serves_a_drawing(tmp_path):
     assert "not a DWG" in rejected.json()["detail"]
     assert client.get(f"/api/drawings/{drawing_id}/source.dxf").status_code == 404
     assert client.get("/api/drawings/../../etc/drawing.svg").status_code == 404
+
+
+def test_drawing_assembly_builds_3d_and_checks_piping(tmp_path, plan_layout_dxf):
+    project_root = Path(__file__).parents[2]
+    client = TestClient(create_app(project_root / "examples" / "demo_skid.yaml", tmp_path / "web"))
+    uploaded = client.post(
+        "/api/drawings?filename=plan-layout.dxf",
+        content=plan_layout_dxf.read_bytes(),
+        headers={"Content-Type": "application/octet-stream"},
+    ).json()
+    drawing_id = uploaded["drawing_id"]
+
+    response = client.post(f"/api/drawings/{drawing_id}/assembly", json={"cost_per_metre": 200})
+    assert response.status_code == 200
+    payload = response.json()
+    report = payload["report"]
+    assert report["supported"] is True
+    assert report["lines"][0]["optimised"]["assurance_pass"] is True
+    kinds = [mesh["kind"] for mesh in payload["meshes"]]
+    assert kinds.count("obstacle") == 4
+    assert {"port", "route", "drawn"} <= set(kinds)
+
+    config = client.get(f"/api/drawings/{drawing_id}/assembly/line-1/config.json")
+    assert config.status_code == 200
+    routed = client.post("/api/route", json=config.json())
+    assert routed.status_code == 200 and routed.json()["assurance"]["overall_pass"] is True
+    saved = client.get(f"/api/drawings/{drawing_id}/assembly/piping_check.json").json()
+    assert (
+        saved["lines"][0]["drawn"]["estimated_cost"]
+        == report["lines"][0]["drawn"]["estimated_cost"]
+    )
+    step = client.get(f"/api/drawings/{drawing_id}/assembly/line-1/drawn_assembly.step")
+    assert step.status_code == 200 and b"ISO-10303-21" in step.content[:64]
+
+    assert client.get(f"/api/drawings/{drawing_id}/assembly/line-1/source.dxf").status_code == 404
+    assert client.get(f"/api/drawings/{drawing_id}/assembly/line-0/config.json").status_code == 404
+    assert client.get(f"/api/drawings/{drawing_id}/assembly/summary.json").status_code == 404
+    assert client.post("/api/drawings/0000000000000000/assembly", json={}).status_code == 404
+    bad_role = client.post(
+        f"/api/drawings/{drawing_id}/assembly", json={"layer_roles": {"X": "valve"}}
+    )
+    assert bad_role.status_code == 422
