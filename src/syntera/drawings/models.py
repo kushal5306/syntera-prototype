@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class DrawingModel(BaseModel):
@@ -74,3 +74,91 @@ class DrawingSummary(DrawingModel):
     audit_fixes: int
     # Records written before render versions existed are version 1 (dark background).
     render_version: int = 1
+
+
+LayerRole = Literal["equipment", "pipe", "pipe_centreline", "nozzle", "frame", "ignore"]
+
+
+class AssemblyOptions(DrawingModel):
+    """User-editable inputs for turning a plan drawing into a 3D assembly (millimetres).
+
+    ``None`` means "read it from the drawing, else use the stated default".
+    """
+
+    equipment_height_mm: float | None = Field(default=None, gt=0)
+    pipe_elevation_mm: float | None = Field(default=None, gt=0)
+    outer_diameter_mm: float | None = Field(default=None, gt=0)
+    bend_radius_mm: float | None = Field(default=None, gt=0)
+    clearance_mm: float | None = Field(default=None, ge=0)
+    cost_per_metre: float = Field(default=120.0, ge=0)
+    cost_per_bend: float = Field(default=45.0, ge=0)
+    currency: str = Field(default="USD", min_length=1, max_length=8)
+    layer_roles: dict[str, LayerRole] = Field(default_factory=dict)
+
+
+class Assumption(DrawingModel):
+    """Where one value of the 3D model came from, so a reviewer can challenge it."""
+
+    quantity: str
+    value: str
+    source: Literal["drawing", "default", "user"]
+    note: str = ""
+
+
+class InferredEquipment(DrawingModel):
+    name: str
+    shape: Literal["box", "cylinder"]
+    layer: str
+    plan_handle: str
+    height_source: Literal["drawing", "default", "user"]
+
+
+class RouteCheck(DrawingModel):
+    """One route (as drawn, or Syntera's) measured and checked against exact geometry."""
+
+    points: list[tuple[float, float, float]]
+    length_mm: float | None
+    straight_length_mm: float | None
+    bend_length_mm: float | None
+    bends: int
+    estimated_cost: float | None
+    buildable: bool
+    assurance_pass: bool
+    collision_free: bool | None
+    minimum_clearance_mm: float | None
+    failure_reasons: list[str]
+    too_close_to: list[str] = Field(default_factory=list)
+
+
+class LineCheck(DrawingModel):
+    name: str
+    folder: str
+    nozzle_shift_mm: float
+    voxel_resolution_mm: float
+    drawn: RouteCheck
+    optimised: RouteCheck
+    length_saving_mm: float | None
+    length_saving_percent: float | None
+    bend_saving: int | None
+    cost_saving: float | None
+    findings: list[str]
+
+
+class PipingCheckReport(DrawingModel):
+    """Deterministic 3D reconstruction and piping review of one drawing as drawn."""
+
+    drawing_id: str
+    filename: str
+    source_sha256: str
+    supported: bool
+    message: str
+    currency: str
+    workspace_mm: tuple[float, float, float] | None
+    views_found: list[str]
+    equipment: list[InferredEquipment]
+    assumptions: list[Assumption]
+    lines: list[LineCheck]
+    total_drawn_length_mm: float | None
+    total_optimised_length_mm: float | None
+    total_cost_saving: float | None
+    findings: list[str]

@@ -168,6 +168,37 @@ The rendered view is for review, not a measurement: fonts and linetypes are appr
 and entities far outside the drawing (for example, a mis-scaled block) are left out of the
 default view and listed. Units come from `$INSUNITS`; unitless drawings are flagged.
 
+### 3D assembly and piping check from a drawing
+
+On the Drawings page, **Generate 3D and check piping** turns a plan layout into a 3D
+assembly and reviews its piping as drawn:
+
+- Equipment outlines (closed polylines, circles, blocks) on layers named like `EQUIP`,
+  `VESSEL`, `PUMP` or `TANK` become boxes and vertical cylinders. Pipe runs on `PIPE-CL` or
+  `PIPE`/`PIPING` layers are joined into lines and reduced to their corner points; nozzles
+  come from `NOZZLE` layers. Other layer names can be mapped under **Layer roles**.
+- A plan fixes X and Y only. Heights come from a front elevation when the drawing has
+  views titled PLAN and FRONT ELEVATION (as Syntera's own `layout.dxf` does); otherwise
+  equipment is 1000 mm tall and pipes run at 500 mm. Pipe OD, bend radius and clearance
+  are read from pipe widths, nozzle circles or notes such as `OD 20`, else defaulted.
+  Every value is listed with its source (drawing, default or user) and can be edited.
+- Each drawn run is swept into an exact CAD tube and verified with the same checks as a
+  routed tube (collision, clearance, bend radius, port alignment), naming any equipment
+  it clashes with. Syntera then routes the same nozzles itself. Length, bends and an
+  estimated cost (editable rates per metre and per bend) are compared, and a saving is
+  only claimed for a Syntera route that passes every check.
+- **3D assembly** shows equipment, the drawn pipe (amber) and Syntera's route (teal);
+  **Open in route workbench** loads the inferred model there. STEP files of both routes,
+  the layout DXF and `piping_check.json` are downloadable.
+
+P&IDs and other schematics show connectivity, not position, so they are refused with an
+explanation. Offline:
+
+```bash
+python -m syntera.cli drawing-check --input path/to/plan.dxf --output outputs/drawings \
+  --options '{"equipment_height_mm": 1200, "cost_per_metre": 150}'
+```
+
 ## Architecture
 
 Pydantic validates an explicitly millimetre-based input. CadQuery creates synthetic
@@ -200,7 +231,10 @@ See [docs/architecture.md](docs/architecture.md) for detail.
 - Peak von Mises includes clamp-edge stress concentrations, which is conservative.
   Mesh-convergence studies are not yet automated.
 - Drawing intake reads model space only; paper-space layouts, xrefs, and 3D solids in
-  DWG/DXF files are not interpreted, and nothing read from a drawing feeds routing yet.
+  DWG/DXF files are not interpreted. The drawing piping check reads each pipe run at one
+  elevation (risers drawn only in elevations are not rebuilt), checks square bends only,
+  treats each run separately (other pipes are not obstacles), checks at most six runs,
+  and needs nozzles clear of equipment by the required clearance for Syntera to route.
 - This research prototype is not certified for production or safety-critical use.
 
 ## Next milestones
