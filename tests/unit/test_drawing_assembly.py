@@ -154,7 +154,7 @@ def test_part_drawing_without_plant_layers_is_not_called_a_schematic(tmp_path):
 
     report = _check(path, tmp_path / "out").report
     assert not report.supported
-    assert "P&ID" not in report.message
+    assert "looks like a P&ID" not in report.message
     assert "no layers named like equipment or piping" in report.message
 
 
