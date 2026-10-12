@@ -39,6 +39,8 @@ def test_layer_roles_follow_names_and_overrides():
     assert layer_role("P-Piping", {}) == "pipe"
     assert layer_role("EQUIP-VESSELS", {}) == "equipment"
     assert layer_role("NOZZLES", {}) == "nozzle"
+    assert layer_role("M-EQPM", {}) == "equipment"  # US National CAD Standard
+    assert layer_role("M-EQPM-NOZL", {}) == "nozzle"
     assert layer_role("A-WALL", {}) is None
     assert layer_role("A-WALL", {"A-WALL": "equipment"}) == "equipment"
 
@@ -142,6 +144,18 @@ def test_schematic_drawing_is_refused_with_a_clear_message(tmp_path):
     assert not report.supported
     assert "P&ID" in report.message
     assert report.lines == [] and report.findings == []
+
+
+def test_part_drawing_without_plant_layers_is_not_called_a_schematic(tmp_path):
+    doc = ezdxf.new("R2018")
+    doc.modelspace().add_circle((0, 0), 25)
+    path = tmp_path / "gear.dxf"
+    doc.saveas(path)
+
+    report = _check(path, tmp_path / "out").report
+    assert not report.supported
+    assert "P&ID" not in report.message
+    assert "no layers named like equipment or piping" in report.message
 
 
 def test_layer_roles_rescue_unconventional_layer_names(plan_layout_dxf, tmp_path):

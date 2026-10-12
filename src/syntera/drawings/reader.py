@@ -23,7 +23,7 @@ from syntera.drawings.models import (
 
 MAX_NOTES = 500
 # Bump when the SVG rendering changes so stored drawings are re-rendered on next access.
-RENDER_VERSION = 2
+RENDER_VERSION = 3
 PAPER = "#ffffff"
 # Drawing colours are darkened until they reach this contrast ratio against white paper,
 # so white, yellow and cyan CAD colours stay legible (WCAG 2.1 non-text contrast).
@@ -32,6 +32,12 @@ HEX_COLOUR = re.compile(r"#[0-9a-fA-F]{6}\b")
 # An entity is clipped from the default view when it alone is this many times larger than
 # everything else together (typically a stray or mis-scaled block far from the drawing).
 OUTLIER_RATIO = 10.0
+# The SVG sheet's longest side, in mm. Drawings smaller than the minimum (parts in inches,
+# plants in metres) are scaled up so the viewer's fixed margins do not swamp them.
+MIN_SHEET_MM = 420.0
+MAX_SHEET_WIDTH_MM = 1189.0
+MAX_SHEET_HEIGHT_MM = 841.0
+SHEET_MARGIN_MM = 4.0
 MAX_OUTLIERS = 5
 
 DIMENSION_KINDS = {
@@ -194,6 +200,21 @@ def _recolour_styles(document: str) -> str:
     return styles + document[end:]
 
 
+def sheet_page(view: BoundingBox2d) -> layout.Page:
+    """Size the SVG sheet to the view's aspect ratio, between A3 and A0 on its long side."""
+    width = max(view.size.x, 1e-9)
+    height = max(view.size.y, 1e-9)
+    margins = 2 * SHEET_MARGIN_MM
+    fit = min((MAX_SHEET_WIDTH_MM - margins) / width, (MAX_SHEET_HEIGHT_MM - margins) / height)
+    scale = min(fit, max(1.0, MIN_SHEET_MM / max(width, height)))
+    return layout.Page(
+        max(width * scale, 1.0) + margins,
+        max(height * scale, 1.0) + margins,
+        layout.Units.mm,
+        layout.Margins.all(SHEET_MARGIN_MM),
+    )
+
+
 def render_svg(doc: Drawing, view: BoundingBox2d) -> str:
     """Render model space as dark lines on white paper, framed on ``view``."""
     if not view.has_data:
@@ -207,7 +228,7 @@ def render_svg(doc: Drawing, view: BoundingBox2d) -> str:
         lineweight_policy=config.LineweightPolicy.RELATIVE,
     )
     Frontend(RenderContext(doc), backend, config=paper).draw_layout(doc.modelspace(), finalize=True)
-    page = layout.Page(0, 0, layout.Units.mm, layout.Margins.all(4), max_width=1189, max_height=841)
+    page = sheet_page(view)
     # Line widths scale with the sheet (heaviest 0.2% of its size); the thinnest lines are
     # kept at half of that so they stay visible when the whole sheet is in view.
     settings = layout.Settings(max_stroke_width=0.002, min_stroke_width=0.5)
