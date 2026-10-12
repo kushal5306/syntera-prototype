@@ -30,3 +30,6 @@
     so every inferred value carries its source (drawing, default or user) in the piping
     check report. Unrecognised drawings and schematics are refused rather than guessed,
     and a route saving is reported only for a Syntera route that passes every exact check.
+14. **P&IDs become 3D only as a proposed layout.** P&ID graphics positions are never read
+    as plant positions. Equipment is placed and lines routed deterministically, each route
+    passes the same exact checks, and the report says the layout is a proposal.

@@ -145,3 +145,29 @@ def test_drawing_assembly_builds_3d_and_checks_piping(tmp_path, plan_layout_dxf)
         f"/api/drawings/{drawing_id}/assembly", json={"layer_roles": {"X": "valve"}}
     )
     assert bad_role.status_code == 422
+
+
+def test_pid_upload_builds_a_proposed_plant(tmp_path, dexpi_xml):
+    project_root = Path(__file__).parents[2]
+    client = TestClient(create_app(project_root / "examples" / "demo_skid.yaml", tmp_path / "web"))
+
+    response = client.post(
+        "/api/pid?filename=unit-100.xml",
+        content=dexpi_xml.read_bytes(),
+        headers={"Content-Type": "application/xml"},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    plant = payload["plant_id"]
+    assert payload["report"]["routed"] == 3
+    kinds = [mesh["kind"] for mesh in payload["meshes"]]
+    assert kinds.count("obstacle") == 2 and "route" in kinds
+
+    config = client.get(f"/api/pid/{plant}/route-1/config.json")
+    assert config.status_code == 200
+    assert client.post("/api/route", json=config.json()).json()["assurance"]["overall_pass"]
+    assert client.get(f"/api/pid/{plant}/plant_assembly.step").status_code == 200
+    assert client.get(f"/api/pid/{plant}/source.xml").status_code == 404
+    assert client.get(f"/api/pid/{plant}/route-0/config.json").status_code == 404
+    bad = client.post("/api/pid?filename=x.xml", content=b"<svg/>")
+    assert bad.status_code == 422 and "PlantModel" in bad.json()["detail"]

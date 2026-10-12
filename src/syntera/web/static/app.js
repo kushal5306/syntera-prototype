@@ -651,8 +651,10 @@ if (!LIVE) {
   $("#mode-chip i").style.background = "var(--pass)";
   (async () => {
     // /?drawing=<id>&line=line-1 opens the 3D assembly inferred from an uploaded drawing.
-    const query = new URLSearchParams(location.search), drawing = query.get("drawing");
-    const source = drawing ? `/api/drawings/${encodeURIComponent(drawing)}/assembly/${encodeURIComponent(query.get("line") || "line-1")}/config.json` : "/api/config";
+    // /?pid=<id>&route=route-1 opens one line of a P&ID's proposed plant layout.
+    const query = new URLSearchParams(location.search), drawing = query.get("drawing"), pid = query.get("pid");
+    const source = drawing ? `/api/drawings/${encodeURIComponent(drawing)}/assembly/${encodeURIComponent(query.get("line") || "line-1")}/config.json`
+      : pid ? `/api/pid/${encodeURIComponent(pid)}/${encodeURIComponent(query.get("route") || "route-1")}/config.json` : "/api/config";
     try { serverConfig = await api(source); await generate(structuredClone(serverConfig)); }
     catch (error) { $("#mode-chip span").textContent = `Cannot reach the server: ${error.message}`; }
   })();

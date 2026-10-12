@@ -395,6 +395,65 @@ const model = (() => {
   };
 })();
 
+// ---- P&ID (DEXPI XML) to a proposed 3D plant ----
+async function uploadPid(file) {
+  busy("Placing equipment and routing every line. Large P&IDs take a minute or two…");
+  try {
+    const payload = await api(`/api/pid?filename=${encodeURIComponent(file.name)}`, {
+      method: "POST", headers: { "Content-Type": "application/xml" }, body: file,
+    });
+    state.summary = null;
+    state.check = null;
+    document.querySelectorAll("#drawing-list li").forEach((li) => li.setAttribute("aria-selected", "false"));
+    $("drop").hidden = true;
+    $("details").replaceChildren(...renderPlant(payload));
+    $("mode-3d").disabled = false;
+    $("mode-2d").disabled = true;
+    $("legend-drawn").hidden = true;
+    model.load(payload);
+    setMode("3d");
+    $("units-foot").textContent = "millimetres · Z up · drag to orbit";
+  } catch (error) {
+    $("details").replaceChildren(el("div", { class: "reason" }, `Could not build ${file.name}: ${error.message}`));
+  } finally {
+    $("busy").hidden = true;
+  }
+}
+
+function renderPlant(payload) {
+  const r = payload.report, base = `/api/pid/${payload.plant_id}`;
+  const money = (v) => (v === null || v === undefined ? "–" : `${r.currency} ${fmt(v, 0)}`);
+  const ws = r.workspace_mm;
+  return [
+    section("Proposed 3D layout from P&ID", null, el("p", { class: "note" },
+      "A P&ID shows what connects to what, not where things sit. Syntera placed the equipment and routed every line to satisfy it. Treat this as a starting layout to review, not the real plant.")),
+    kv([
+      ["P&ID", r.filename],
+      ["Lines routed", `${r.routed} of ${r.routes.length}`],
+      ["Total pipe", `${fmt(r.total_pipe_length_mm / 1000, 1)} m`],
+      ["Bends", fmt(r.total_bends, 0)],
+      ["Estimated pipe cost", money(r.total_cost)],
+      ["Skid", `${fmt(ws[0] / 1000, 1)} × ${fmt(ws[1] / 1000, 1)} × ${fmt(ws[2] / 1000, 1)} m`],
+      ["Footprint", `${fmt(r.footprint_m2, 1)} m²`],
+    ]),
+    el("div", { class: "row wrap" },
+      el("a", { class: "btn", href: `${base}/plant_assembly.step` }, "Plant STEP"),
+      el("a", { class: "btn", href: `${base}/plant_layout.json` }, "Layout JSON")),
+    section("Lines", `grid ${fmt(r.voxel_resolution_mm, 0)} mm`, table([["Line"], ["Length", "r"], ["Checks"]],
+      r.routes.map((route) => el("tr", { title: route.failure_reasons.join("; ") },
+        el("td", {}, route.routed ? el("a", { href: `/?pid=${payload.plant_id}&route=${route.folder}`, title: "Open in route workbench" }, route.line) : route.line,
+          el("div", { class: "note line-label" }, route.label)),
+        el("td", { class: "r num" }, route.length_mm === null ? "–" : `${fmt(route.length_mm / 1000, 2)} m`),
+        el("td", {}, el("span", { class: `chip ${route.assurance_pass ? "pass" : "fail"}` }, route.assurance_pass ? "pass" : "not routed")))))),
+    r.failed ? el("div", { class: "reason soft" }, `${r.failed} line(s) could not be routed in this layout: ${r.routes.filter((x) => !x.routed).map((x) => `${x.line} (${x.failure_reasons[0] || "no route"})`).join("; ")}.`) : null,
+    section("Equipment", `${r.equipment.length}`, table([["Tag"], ["Class"], ["Size, mm"], ["Source"]],
+      r.equipment.map((e) => el("tr", { title: e.size_note }, el("td", {}, e.tag), el("td", { class: "cell-text" }, e.component_class),
+        el("td", { class: "num" }, e.size.map((v) => fmt(v, 0)).join(" × ")),
+        el("td", {}, el("span", { class: `chip ${e.size_source === "pid" ? "pass" : "warn"}` }, e.size_source === "pid" ? "P&ID" : "default")))))),
+    section("What was assumed", null, el("ul", { class: "findings" }, [...r.assumptions, ...r.skipped].map((text) => el("li", {}, text)))),
+  ].filter(Boolean);
+}
+
 // ---- loading ----
 async function show(drawingId) {
   const s = await api(`/api/drawings/${drawingId}/summary.json`);
@@ -404,6 +463,8 @@ async function show(drawingId) {
     state.check = null;
     $("mode-3d").disabled = true;
   }
+  $("mode-2d").disabled = false;
+  $("legend-drawn").hidden = false;
   setMode("2d");
   $("drop").hidden = true;
   $("stage").hidden = false;
@@ -422,8 +483,14 @@ async function refreshList() {
   return items;
 }
 
-async function upload(file) {
+function busy(text) {
+  $("busy-text").textContent = text;
   $("busy").hidden = false;
+}
+
+async function upload(file) {
+  if (/\.xml$/i.test(file.name)) return uploadPid(file);
+  busy("Converting and reading the drawing…");
   try {
     const s = await api(`/api/drawings?filename=${encodeURIComponent(file.name)}`, {
       method: "POST", headers: { "Content-Type": "application/octet-stream" }, body: file,
@@ -439,6 +506,11 @@ async function upload(file) {
 
 async function init() {
   bindSheet();
+  $("pid-input").addEventListener("change", (event) => {
+    const file = event.target.files[0];
+    if (file) uploadPid(file);
+    event.target.value = "";
+  });
   $("file-input").addEventListener("change", (event) => {
     const file = event.target.files[0];
     if (file) upload(file);
