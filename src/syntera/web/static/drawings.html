@@ -20,6 +20,7 @@
     <div class="spacer"></div>
     <div class="mode-chip" id="converter-chip"><i></i><span>Checking DWG support…</span></div>
     <a class="btn" href="/">Route workbench</a>
+    <label class="btn upload-btn" title="Upload a DEXPI XML P&amp;ID export to get a proposed 3D layout">P&amp;ID to 3D (DEXPI XML)<input id="pid-input" type="file" accept=".xml" hidden></label>
     <label class="btn primary upload-btn">Upload DWG or DXF<input id="file-input" type="file" accept=".dwg,.dxf" hidden></label>
   </header>
 
@@ -40,8 +41,8 @@
         <div id="sheet-pins"></div>
       </div>
       <canvas id="model-canvas" hidden aria-label="3D assembly inferred from the drawing"></canvas>
-      <div class="model-legend" id="model-legend" hidden><span><i class="swatch drawn"></i>Pipe as drawn</span><span><i class="swatch syntera"></i>Syntera's verified route</span><span><i class="swatch equip"></i>Equipment</span></div>
-      <div class="busy" id="busy" hidden><span></span>Converting and reading the drawing…</div>
+      <div class="model-legend" id="model-legend" hidden><span id="legend-drawn"><i class="swatch drawn"></i>Pipe as drawn</span><span><i class="swatch syntera"></i>Syntera's verified route</span><span><i class="swatch equip"></i>Equipment</span></div>
+      <div class="busy" id="busy" hidden><span></span><b id="busy-text">Converting and reading the drawing…</b></div>
       <div class="vp-tools">
         <div class="seg" role="group" aria-label="View">
           <button id="mode-2d" aria-pressed="true">2D drawing</button><button id="mode-3d" aria-pressed="false" disabled title="Generate the 3D assembly first">3D assembly</button>

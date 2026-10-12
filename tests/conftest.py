@@ -134,3 +134,81 @@ def write_plan_layout(path: Path) -> Path:
 @pytest.fixture
 def plan_layout_dxf(tmp_path: Path) -> Path:
     return write_plan_layout(tmp_path / "plan-layout.dxf")
+
+
+DEXPI_SAMPLE = """<?xml version="1.0" encoding="UTF-8"?>
+<PlantModel>
+  <PlantInformation OriginatingSystem="Syntera test" Units="mm"/>
+  <Equipment ID="Tank-1" ComponentClass="Tank">
+    <GenericAttributes>
+      <GenericAttribute Name="TagNameAssignmentClass" Value="T100"/>
+      <GenericAttribute Name="CylinderLength" Value="2" Units="Metre"/>
+      <GenericAttribute Name="NominalCapacity(Volume)" Value="2" Units="MetreCubed"/>
+    </GenericAttributes>
+    <Nozzle ID="N-T1"><GenericAttributes>
+      <GenericAttribute Name="SubTagNameAssignmentClass" Value="N1"/></GenericAttributes></Nozzle>
+    <Nozzle ID="N-T2"><GenericAttributes>
+      <GenericAttribute Name="SubTagNameAssignmentClass" Value="N2"/></GenericAttributes></Nozzle>
+  </Equipment>
+  <Equipment ID="Pump-1" ComponentClass="CentrifugalPump">
+    <GenericAttributes>
+      <GenericAttribute Name="TagNameAssignmentClass" Value="P101"/>
+    </GenericAttributes>
+    <Nozzle ID="N-P1"><GenericAttributes>
+      <GenericAttribute Name="SubTagNameAssignmentClass" Value="N1"/></GenericAttributes></Nozzle>
+    <Nozzle ID="N-P2"><GenericAttributes>
+      <GenericAttribute Name="SubTagNameAssignmentClass" Value="N2"/></GenericAttributes></Nozzle>
+  </Equipment>
+  <Equipment ID="Frame-1" ComponentClass="Skid"/>
+  <PipingNetworkSystem ID="PNS-1">
+    <GenericAttributes>
+      <GenericAttribute Name="LineNumberAssignmentClass" Value="L1"/>
+      <GenericAttribute Name="NominalDiameterNumericalValueRepresentationAssignmentClass"
+        Value="50"/>
+    </GenericAttributes>
+    <PipingNetworkSegment ID="S1">
+      <PipeOffPageConnector ID="FlowInPipeOffPageConnector-1"
+        ComponentClass="FlowInPipeOffPageConnector"/>
+      <Connection FromID="FlowInPipeOffPageConnector-1" ToID="N-T1"/>
+    </PipingNetworkSegment>
+  </PipingNetworkSystem>
+  <PipingNetworkSystem ID="PNS-2">
+    <GenericAttributes>
+      <GenericAttribute Name="LineNumberAssignmentClass" Value="L2"/>
+      <GenericAttribute Name="NominalDiameterNumericalValueRepresentationAssignmentClass"
+        Value="80"/>
+    </GenericAttributes>
+    <PipingNetworkSegment ID="S2">
+      <PipingComponent ID="BallValve-1" ComponentClass="BallValve"/>
+      <Connection FromID="N-T2" ToID="BallValve-1"/>
+    </PipingNetworkSegment>
+    <PipingNetworkSegment ID="S3">
+      <PipingComponent ID="PipeTee-1" ComponentClass="PipeTee"/>
+      <Connection FromID="BallValve-1" ToID="PipeTee-1"/>
+    </PipingNetworkSegment>
+    <PipingNetworkSegment ID="S4">
+      <Connection FromID="PipeTee-1" ToID="N-P1"/>
+    </PipingNetworkSegment>
+    <PipingNetworkSegment ID="S5">
+      <PipingComponent ID="BlindFlange-1" ComponentClass="BlindFlange"/>
+      <Connection FromID="PipeTee-1" ToID="BlindFlange-1"/>
+    </PipingNetworkSegment>
+  </PipingNetworkSystem>
+  <PipingNetworkSystem ID="PNS-3">
+    <GenericAttributes>
+      <GenericAttribute Name="LineNumberAssignmentClass" Value="L3"/>
+    </GenericAttributes>
+    <PipingNetworkSegment ID="S6">
+      <Connection FromID="N-P2"/>
+    </PipingNetworkSegment>
+  </PipingNetworkSystem>
+</PlantModel>
+"""
+
+
+@pytest.fixture
+def dexpi_xml(tmp_path: Path) -> Path:
+    """Synthetic DEXPI P&ID: inlet -> tank -> valve and tee (blind drain) -> pump -> outlet."""
+    path = tmp_path / "unit-100.xml"
+    path.write_text(DEXPI_SAMPLE, encoding="utf-8")
+    return path

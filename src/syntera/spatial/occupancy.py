@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from itertools import product
 
 import numpy as np
 
@@ -35,6 +34,28 @@ def point_to_obstacle_distance(point: Point3, obstacle: Obstacle) -> float:
     return float(np.linalg.norm(delta))
 
 
+def _distance_field(grid: np.ndarray, obstacle: Obstacle) -> np.ndarray:
+    """Vectorised :func:`point_to_obstacle_distance` over every grid node."""
+    if isinstance(obstacle, StepObstacle):
+        flat = grid.reshape(-1, 3)
+        values = [point_to_obstacle_distance(tuple(map(float, p)), obstacle) for p in flat]
+        return np.asarray(values, dtype=float).reshape(grid.shape[:-1])
+    center = np.asarray(obstacle.center, dtype=float)
+    delta = grid - center
+    if isinstance(obstacle, BoxObstacle):
+        outside = np.maximum(np.abs(delta) - np.asarray(obstacle.size) / 2.0, 0.0)
+        return np.linalg.norm(outside, axis=-1)
+    axis_index = {"x": 0, "y": 1, "z": 2}[obstacle.axis]
+    radial_indices = [index for index in range(3) if index != axis_index]
+    radial = np.linalg.norm(delta[..., radial_indices], axis=-1)
+    axial = np.abs(delta[..., axis_index])
+    outside = np.stack(
+        [np.maximum(radial - obstacle.radius, 0.0), np.maximum(axial - obstacle.height / 2.0, 0.0)],
+        axis=-1,
+    )
+    return np.linalg.norm(outside, axis=-1)
+
+
 @dataclass(frozen=True)
 class OccupancyGrid:
     """Regular grid whose nodes represent possible tube centreline locations."""
@@ -53,23 +74,14 @@ class OccupancyGrid:
             for dimension in config.workspace.dimensions
         )
         shape = tuple(len(axis) for axis in axes)
-        occupied = np.zeros(shape, dtype=bool)
-        obstacle_distance = np.full(shape, np.inf, dtype=float)
         inflation = config.tube.outer_diameter / 2.0 + config.tube.minimum_clearance
-
-        for index in product(*(range(size) for size in shape)):
-            point = tuple(float(axes[axis][index[axis]]) for axis in range(3))
-            boundary_clearance = min(
-                min(coordinate, dimension - coordinate)
-                for coordinate, dimension in zip(point, config.workspace.dimensions, strict=False)
-            )
-            obstacle_distance[index] = min(
-                (point_to_obstacle_distance(point, obstacle) for obstacle in config.obstacles),
-                default=np.inf,
-            )
-            occupied[index] = (
-                boundary_clearance + 1e-9 < inflation or obstacle_distance[index] + 1e-9 < inflation
-            )
+        grid = np.stack(np.meshgrid(*axes, indexing="ij"), axis=-1)
+        dims = np.asarray(config.workspace.dimensions, dtype=float)
+        boundary_clearance = np.minimum(grid, dims - grid).min(axis=-1)
+        obstacle_distance = np.full(shape, np.inf, dtype=float)
+        for obstacle in config.obstacles:
+            obstacle_distance = np.minimum(obstacle_distance, _distance_field(grid, obstacle))
+        occupied = (boundary_clearance + 1e-9 < inflation) | (obstacle_distance + 1e-9 < inflation)
         return cls(occupied, axes, resolution, inflation, obstacle_distance)
 
     @property

@@ -81,11 +81,11 @@ class PipingCheckResult:
     lines: list[LineGeometry]
 
 
-def voxel_resolution(dimensions: Point3) -> float:
+def voxel_resolution(dimensions: Point3, max_voxels: int = MAX_VOXELS) -> float:
     """Finest standard routing grid that keeps the occupancy grid small enough to search."""
     for step in VOXEL_STEPS_MM:
         count = math.prod(math.floor(size / step) + 1 for size in dimensions)
-        if count <= MAX_VOXELS:
+        if count <= max_voxels:
             return step
     return VOXEL_STEPS_MM[-1]
 

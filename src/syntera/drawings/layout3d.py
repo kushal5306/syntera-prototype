@@ -405,7 +405,8 @@ def infer_layout(
             message=reason
             + " A plan layout works: equipment outlines on a layer named like EQUIPMENT, "
             "VESSEL or PUMP, and pipe runs on a layer named like PIPE. Layers with other "
-            "names can be given a role under Layer roles.",
+            "names can be given a role under Layer roles. For a P&ID, upload its DEXPI XML "
+            "export instead to get a proposed 3D layout.",
             assumptions=assumptions,
         )
 

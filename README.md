@@ -191,12 +191,38 @@ assembly and reviews its piping as drawn:
   **Open in route workbench** loads the inferred model there. STEP files of both routes,
   the layout DXF and `piping_check.json` are downloadable.
 
-P&IDs and other schematics show connectivity, not position, so they are refused with an
-explanation. Offline:
+P&IDs and other schematics show connectivity, not position, so a DWG/DXF P&ID is refused
+with an explanation; use the DEXPI route below for those. Offline:
 
 ```bash
 python -m syntera.cli drawing-check --input path/to/plan.dxf --output outputs/drawings \
   --options '{"equipment_height_mm": 1200, "cost_per_metre": 150}'
+```
+
+### Proposed 3D layout from a P&ID (DEXPI XML)
+
+A P&ID records what connects to what, not where anything sits, so a 3D model of it has to
+be designed rather than read. **P&ID to 3D (DEXPI XML)** on the Drawings page does that
+from a DEXPI (Proteus XML) export, which most P&ID tools can write:
+
+- Equipment tags, classes, nozzles and sizes (tank length and capacity, tube length, plate
+  size, column height and diameter) are read; missing sizes use stated class defaults.
+  Graphics positions are ignored.
+- The piping graph is reduced to runs between nozzles and battery limits (off-page
+  connectors and open ends at the skid edge). Valves, reducers and tees are passed
+  through, blind-flanged stubs and drains dropped, and a header with branches is routed
+  as a chain through its terminals.
+- Equipment is placed on a grid with 1500 mm access gaps and rearranged by pairwise swaps
+  to shorten connected nozzles. Each nozzle faces what it connects to.
+- Lines are routed largest bore first with OD from the nominal size, bend radius 1.5 x OD
+  and clearance half the OD. Each routed pipe is an obstacle for later lines, and every
+  route is verified with the exact checks. Lines that cannot be routed are listed.
+
+The result is a 3D view, a plant STEP file, `plant_layout.json` (total pipe length, bends,
+cost, footprint) and per-line workbench links. Offline:
+
+```bash
+python -m syntera.cli pid-3d --input path/to/pid.xml --output outputs/pid
 ```
 
 ## Architecture
