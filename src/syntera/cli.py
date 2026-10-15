@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from collections.abc import Callable
 from pathlib import Path
 
 import yaml
@@ -15,6 +16,8 @@ from syntera.config import load_config
 from syntera.pipeline import execute_pipeline
 from syntera.reporting.output import write_json
 from syntera.schemas import FeaManifest, RouteResult
+
+ComputeStep = Callable[[], int]
 
 
 def run_demo(config_path: Path, output: Path) -> int:
@@ -129,17 +132,79 @@ def run_compare(baseline_path: Path, output: Path) -> int:
     return 0 if report.design_valid else 2
 
 
+def run_timed(log: Path | None, task: str | None, phase: str, step: ComputeStep) -> int:
+    """Run a compute step, recording its wall-clock time in the KPI 1 log when asked."""
+    if log is None:
+        return step()
+    from syntera.reporting.timelog import append_event, make_event
+
+    if task is None:
+        raise ValueError("--task is required with --time-log")
+    append_event(log, make_event(task, phase, "start", actor="syntera"))
+    try:
+        return step()
+    finally:
+        append_event(log, make_event(task, phase, "stop", actor="syntera"))
+
+
+def run_time(action: str, log: Path, task: str, phase: str, note: str | None) -> int:
+    """Record the start or stop of an engineer's phase in the KPI 1 time log."""
+    from syntera.reporting.timelog import append_event, make_event
+
+    event = make_event(task, phase, action, note=note)
+    append_event(log, event)
+    print(f"{event.at.isoformat()} {action} {task}/{phase} -> {log}")
+    return 0
+
+
+def _duration(hours: float) -> str:
+    return f"{hours * 60:.1f} min" if hours < 1 else f"{hours:.2f} h"
+
+
+def run_kpi1(log: Path, baseline_path: Path, output: Path) -> int:
+    """Compute KPI 1 from a time log and a manual baseline; write ``kpi1_report.json``."""
+    from syntera.reporting.timelog import KPI1_FILE, kpi1_from_files
+
+    report = kpi1_from_files(log, baseline_path)
+    write_json(report, output / KPI1_FILE)
+    kind = "synthetic" if report.baseline_synthetic else "supplied"
+    print(f"Manual baseline: {report.baseline_title} ({kind})")
+    for task in report.tasks:
+        if task.measured:
+            estimate = ", manual hours estimated" if task.manual_estimated else ""
+            print(
+                f"- {task.task}: {_duration(task.ai_hours)} with Syntera vs "
+                f"{_duration(task.manual_hours)} manual (ratio {task.ratio:.4f}{estimate})"
+            )
+        else:
+            print(f"- {task.task}: not measured yet")
+    if report.ratio is not None:
+        print(f"KPI 1 ratio over measured tasks: {report.ratio:.4f} (target < 1)")
+    print(f"KPI 1: {'MET' if report.kpi1_met else 'NOT MET'}")
+    for error in report.log_errors:
+        print(f"- log error: {error}")
+    print(f"Report: {output / KPI1_FILE}")
+    return 0 if report.log_valid else 2
+
+
+def _add_time_log(command: argparse.ArgumentParser) -> None:
+    command.add_argument("--time-log", type=Path, help="append compute time to this KPI 1 log")
+    command.add_argument("--task", help="benchmark task name used in the time log")
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="syntera", description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
     demo = subparsers.add_parser("demo", help="route and verify the synthetic skid")
     demo.add_argument("--config", type=Path, required=True)
     demo.add_argument("--output", type=Path, required=True)
+    _add_time_log(demo)
     evaluate = subparsers.add_parser(
         "fea-evaluate", help="apply FEA acceptance thresholds to solved CalculiX results"
     )
     evaluate.add_argument("--config", type=Path, required=True)
     evaluate.add_argument("--output", type=Path, required=True)
+    _add_time_log(evaluate)
     drawing = subparsers.add_parser(
         "drawing", help="convert a DWG/DXF drawing to DXF, an SVG view and a JSON summary"
     )
@@ -165,11 +230,29 @@ def build_parser() -> argparse.ArgumentParser:
     )
     comparison.add_argument("--baseline", type=Path, required=True)
     comparison.add_argument("--output", type=Path, required=True)
+    timing = subparsers.add_parser("time", help="record a phase start or stop for KPI 1")
+    timing.add_argument("action", choices=["start", "stop"])
+    timing.add_argument("--log", type=Path, required=True)
+    timing.add_argument("--task", required=True)
+    timing.add_argument("--phase", required=True)
+    timing.add_argument("--note")
+    kpi1 = subparsers.add_parser(
+        "kpi1", help="KPI 1: Syntera workflow hours over manual hours, from a time log"
+    )
+    kpi1.add_argument("--log", type=Path, required=True)
+    kpi1.add_argument("--baseline", type=Path, required=True)
+    kpi1.add_argument("--output", type=Path, required=True)
     web = subparsers.add_parser("web", help="launch the interactive 3D application")
     web.add_argument("--config", type=Path, default=Path("examples/demo_skid.yaml"))
     web.add_argument("--output", type=Path, default=Path("outputs/web"))
     web.add_argument("--host", default="127.0.0.1")
     web.add_argument("--port", type=int, default=8000)
+    web.add_argument(
+        "--manual-baseline",
+        type=Path,
+        default=Path("examples/manual_baseline.yaml"),
+        help="manual-hours baseline used for the live KPI 1 ratio",
+    )
     return parser
 
 
@@ -177,9 +260,20 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         if args.command == "demo":
-            return run_demo(args.config, args.output)
+            return run_timed(
+                args.time_log, args.task, "generate", lambda: run_demo(args.config, args.output)
+            )
         if args.command == "fea-evaluate":
-            return run_fea_evaluate(args.config, args.output)
+            return run_timed(
+                args.time_log,
+                args.task,
+                "fea-check",
+                lambda: run_fea_evaluate(args.config, args.output),
+            )
+        if args.command == "time":
+            return run_time(args.action, args.log, args.task, args.phase, args.note)
+        if args.command == "kpi1":
+            return run_kpi1(args.log, args.baseline, args.output)
         if args.command == "drawing":
             return run_drawing(args.input, args.output)
         if args.command == "pid-3d":
@@ -193,7 +287,8 @@ def main(argv: list[str] | None = None) -> int:
 
             from syntera.web.app import create_app
 
-            uvicorn.run(create_app(args.config, args.output), host=args.host, port=args.port)
+            app = create_app(args.config, args.output, args.manual_baseline)
+            uvicorn.run(app, host=args.host, port=args.port)
             return 0
     except (OSError, ValidationError, ValueError, yaml.YAMLError) as error:
         print(f"Configuration or execution error: {error}", file=sys.stderr)

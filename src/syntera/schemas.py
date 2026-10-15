@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
 
 PositiveMm = Annotated[float, Field(gt=0)]
 Point3 = tuple[float, float, float]
@@ -297,6 +297,85 @@ class ComparisonReport(StrictModel):
     design_valid: bool
     validity_reasons: list[str]
     kpi2_met: bool
+
+
+TimeActor = Literal["engineer", "syntera"]
+Label = Annotated[str, Field(min_length=1, max_length=80, pattern=r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")]
+
+
+class TimeEvent(StrictModel):
+    """One line of the KPI 1 time log: a phase of a benchmark task starting or stopping."""
+
+    task: Label
+    phase: Label
+    event: Literal["start", "stop"]
+    at: AwareDatetime
+    actor: TimeActor = "engineer"
+    note: str | None = Field(default=None, max_length=500)
+
+
+class ManualPhase(StrictModel):
+    phase: Label
+    hours: Annotated[float, Field(gt=0)]
+    estimate: bool
+
+
+class ManualTask(StrictModel):
+    task: Label
+    description: str = Field(min_length=1)
+    phases: list[ManualPhase] = Field(min_length=1)
+
+
+class ManualBaseline(StrictModel):
+    """Hours the manual (non-Syntera) workflow takes for each benchmark task."""
+
+    title: str = Field(min_length=1)
+    synthetic_data: bool
+    source: str = Field(min_length=1)
+    tasks: list[ManualTask] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def unique_tasks(self) -> ManualBaseline:
+        names = [task.task for task in self.tasks]
+        if len(names) != len(set(names)):
+            raise ValueError("manual baseline task names must be unique")
+        return self
+
+
+class PhaseHours(StrictModel):
+    phase: str
+    hours: float
+    estimate: bool = False
+
+
+class TaskKpi1(StrictModel):
+    task: str
+    measured: bool
+    ai_hours: float
+    manual_hours: float
+    ratio: float | None
+    manual_estimated: bool
+    ai_phases: list[PhaseHours]
+    manual_phases: list[PhaseHours]
+
+
+class Kpi1Report(StrictModel):
+    """KPI 1: AI workflow hours (review and correction included) over manual hours."""
+
+    baseline_title: str
+    baseline_synthetic: bool
+    baseline_source: str
+    baseline_sha256: str
+    log_sha256: str
+    events: int
+    tasks: list[TaskKpi1]
+    ai_hours: float
+    manual_hours: float
+    ratio: float | None
+    log_valid: bool
+    log_errors: list[str]
+    unmeasured_tasks: list[str]
+    kpi1_met: bool
 
 
 class AssuranceReport(StrictModel):

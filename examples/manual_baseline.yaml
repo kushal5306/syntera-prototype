@@ -1,0 +1,34 @@
+# Synthetic manual-workflow baseline for KPI 1. These hours are ESTIMATES, not measurements.
+# Replace each phase with hours an engineer logged doing the task in their usual CAD tool,
+# and set estimate: false for every measured phase.
+title: Estimated manual hours for the three Syntera benchmark tasks
+synthetic_data: true
+source: >-
+  Planning estimates for a small process skid done in a conventional CAD workflow, split
+  into the phases of the Syntera Challenge 2 roadmap. Not timed; used for CI and dry runs.
+tasks:
+  - task: one-line
+    description: Route and verify the single line of examples/demo_skid.yaml, no FEA review.
+    phases:
+      - {phase: requirements, hours: 0.5, estimate: true}
+      - {phase: layout, hours: 2.0, estimate: true}
+      - {phase: routing, hours: 3.0, estimate: true}
+      - {phase: clash-check, hours: 1.0, estimate: true}
+      - {phase: report, hours: 1.5, estimate: true}
+  - task: three-lines
+    description: Lay out a three-line skid and route and verify every line.
+    phases:
+      - {phase: requirements, hours: 1.0, estimate: true}
+      - {phase: layout, hours: 4.0, estimate: true}
+      - {phase: routing, hours: 8.0, estimate: true}
+      - {phase: clash-check, hours: 2.0, estimate: true}
+      - {phase: report, hours: 3.0, estimate: true}
+  - task: three-lines-fea
+    description: The three-line skid plus FEA set-up, solve and acceptance review.
+    phases:
+      - {phase: requirements, hours: 1.0, estimate: true}
+      - {phase: layout, hours: 4.0, estimate: true}
+      - {phase: routing, hours: 8.0, estimate: true}
+      - {phase: clash-check, hours: 2.0, estimate: true}
+      - {phase: fea, hours: 10.0, estimate: true}
+      - {phase: report, hours: 4.0, estimate: true}
