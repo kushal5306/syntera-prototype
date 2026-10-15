@@ -5,10 +5,12 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 from threading import Lock
+from typing import Literal
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, Field
 
 from syntera.analysis.calculix import input_sha256
 from syntera.analysis.fields import parse_case_fields, parse_mesh_inp, solve_decks
@@ -17,7 +19,16 @@ from syntera.config import load_config
 from syntera.geometry.cad import assembly_shapes
 from syntera.geometry.step_import import StepImportError
 from syntera.pipeline import PipelineResult, execute_pipeline
-from syntera.schemas import DemoConfig, StepObstacle
+from syntera.reporting.timelog import (
+    TIME_LOG_FILE,
+    append_event,
+    kpi1_from_files,
+    make_event,
+    pair_intervals,
+    read_log,
+    task_hours,
+)
+from syntera.schemas import DemoConfig, Label, StepObstacle, TimeActor
 from syntera.web.drawings import drawings_router
 from syntera.web.mesh import scene_meshes
 from syntera.web.pid import pid_router
@@ -76,11 +87,24 @@ def fea_payload(config: DemoConfig, result: PipelineResult, output: Path) -> dic
     return payload
 
 
-def create_app(config_path: Path, output_root: Path) -> FastAPI:
+class TimeMark(BaseModel):
+    """An engineer's phase start or stop; the server stamps the time, never the browser."""
+
+    task: Label
+    phase: Label
+    event: Literal["start", "stop"]
+    note: str | None = Field(default=None, max_length=500)
+
+
+def create_app(
+    config_path: Path, output_root: Path, manual_baseline: Path | None = None
+) -> FastAPI:
     """Create an application bound to one initial config and controlled output root."""
     static = Path(__file__).with_name("static")
     output = output_root / "latest"
+    time_log = output_root / TIME_LOG_FILE
     lock = Lock()
+    time_lock = Lock()
     app = FastAPI(title="Syntera interactive prototype", version="0.2.0")
     app.mount("/assets", StaticFiles(directory=static), name="assets")
     app.include_router(drawings_router(output_root / "drawings"))
@@ -127,13 +151,24 @@ def create_app(config_path: Path, output_root: Path) -> FastAPI:
             "meshes": scene_meshes(config, assembly),
         }
 
+    def log_time(
+        task: str, phase: str, event: str, actor: TimeActor = "engineer", note: str | None = None
+    ) -> None:
+        with time_lock:
+            append_event(time_log, make_event(task, phase, event, actor=actor, note=note))
+
     @app.post("/api/route")
-    def route(config: DemoConfig) -> dict:
+    def route(config: DemoConfig, task: Label | None = None) -> dict:
         with lock:
+            if task:
+                log_time(task, "generate", "start", actor="syntera")
             try:
                 result = execute_pipeline(checked(config), output)
             except StepImportError as error:
                 raise HTTPException(status_code=422, detail=str(error)) from error
+            finally:
+                if task:
+                    log_time(task, "generate", "stop", actor="syntera")
             return {
                 "config": config.model_dump(mode="json"),
                 "workspace": config.workspace.model_dump(mode="json"),
@@ -148,6 +183,31 @@ def create_app(config_path: Path, output_root: Path) -> FastAPI:
                     if (output / name).is_file()
                 ],
             }
+
+    @app.post("/api/time")
+    def mark_time(mark: TimeMark) -> dict:
+        log_time(mark.task, mark.phase, mark.event, note=mark.note)
+        return time_summary()
+
+    @app.get("/api/time")
+    def time_summary() -> dict:
+        with time_lock:
+            log = read_log(time_log)
+        _, errors, still_open = pair_intervals(log.events)
+        return {
+            "task_hours": task_hours(log.events),
+            "running": [event.model_dump(mode="json") for event in still_open],
+            "errors": log.errors + errors,
+            "recent": [event.model_dump(mode="json") for event in log.events[-20:]],
+        }
+
+    @app.get("/api/kpi1")
+    def kpi1() -> dict:
+        if manual_baseline is None or not manual_baseline.is_file():
+            raise HTTPException(status_code=404, detail="no manual baseline is configured")
+        with time_lock:
+            report = kpi1_from_files(time_log, manual_baseline)
+        return report.model_dump(mode="json")
 
     @app.get("/api/download/{filename}")
     def download(filename: str) -> FileResponse:

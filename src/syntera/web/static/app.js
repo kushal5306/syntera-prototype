@@ -443,14 +443,18 @@ const TABS = {
   review(run) {
     const log = store.get("syntera.review", []);
     const running = reviewStart != null;
+    const tasks = kpi1 ? kpi1.tasks.map((t) => t.task) : [];
     return `<div class="section-title"><h3>Review timer</h3><span class="note">feeds KPI 1</span></div>
-      <p class="note">KPI 1 counts review and correction time against the manual workflow. Start the timer when you begin checking this run and record your decision.</p>
+      <p class="note">KPI 1 counts review and correction time against the manual workflow. Start the timer when you begin checking this run and record your decision.${LIVE ? " The server logs this time, and every routing run, against the task below." : ""}</p>
+      ${LIVE ? `<div class="signoff" style="display:grid;gap:8px"><label class="label" for="rev-task">Benchmark task</label><input type="text" id="rev-task" list="rev-tasks" value="${esc(taskName())}" ${running ? "disabled" : ""}><datalist id="rev-tasks">${tasks.map((t) => `<option value="${esc(t)}">`).join("")}</datalist></div>` : ""}
+      ${timeError ? `<p class="note" style="color:var(--fail)">${esc(timeError)}</p>` : ""}
       <div class="timer"><span class="num" id="timer">${clock(running ? Date.now() - reviewStart : 0)}</span><button class="btn ${running ? "" : "primary"}" id="timer-btn">${running ? "Pause" : "Start review"}</button></div>
       <div class="signoff" style="display:grid;gap:8px"><label class="label" for="rev-name">Reviewer</label><input type="text" id="rev-name" value="${esc(store.get("syntera.reviewer", ""))}" placeholder="Name">
       <label class="label" for="rev-notes">Notes</label><textarea id="rev-notes" placeholder="What did you check or change?"></textarea>
       <div class="row"><button class="btn primary" data-decide="Approved">Approve ${esc(run.name)}</button><button class="btn" data-decide="Changes requested">Request changes</button></div></div>
       <div class="section-title"><h3>Decisions</h3><span class="note">saved in this browser only</span></div>
-      <ul class="log">${log.length ? log.slice().reverse().map((l) => `<li><b>${esc(l.decision)}</b> · ${esc(l.run)} · ${clock(l.ms)} review<br><span class="note">${esc(l.reviewer || "Unnamed")} · ${esc(l.at)}${l.notes ? ` · ${esc(l.notes)}` : ""}</span></li>`).join("") : `<li class="note">No decisions recorded yet.</li>`}</ul>`;
+      <ul class="log">${log.length ? log.slice().reverse().map((l) => `<li><b>${esc(l.decision)}</b> · ${esc(l.run)} · ${clock(l.ms)} review<br><span class="note">${esc(l.reviewer || "Unnamed")} · ${esc(l.at)}${l.notes ? ` · ${esc(l.notes)}` : ""}</span></li>`).join("") : `<li class="note">No decisions recorded yet.</li>`}</ul>
+      ${kpi1Section()}`;
   },
 };
 
@@ -503,7 +507,7 @@ async function generate(config) {
   if (busy) return;
   busy = true; setBusy(true);
   try {
-    const payload = await api("/api/route", config);
+    const payload = await api(`/api/route?task=${encodeURIComponent(taskName())}`, config);
     const run = { name: `Run ${RUNS.length + 1}`, note: describeChanges(config, serverConfig), generated: new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" }), ...payload };
     run.derived = analyse(run);
     RUNS.push(run); BASE = RUNS[0]; state.draft = null;
@@ -511,7 +515,7 @@ async function generate(config) {
   } catch (error) {
     const el = $("#spec-error"); if (el) el.textContent = error.message;
     $("#mode-chip span").textContent = error.message;
-  } finally { busy = false; setBusy(false); }
+  } finally { busy = false; setBusy(false); refreshKpi1(); }
 }
 function setBusy(on) {
   $("#run-btn").disabled = on; const b = $("#spec-run"); if (b) b.disabled = on;
@@ -519,7 +523,27 @@ function setBusy(on) {
   if (LIVE) $("#mode-chip span").textContent = on ? "Routing, verifying and solving…" : `Live · ${RUNS.length} run${RUNS.length === 1 ? "" : "s"} this session`;
 }
 
-let reviewStart = null, reviewAccum = 0;
+let reviewStart = null, reviewAccum = 0, kpi1 = null, timeError = "";
+const taskName = () => store.get("syntera.task", "one-line");
+const hrs = (h) => h == null ? "–" : h < 1 ? `${fmt(h * 60, 1)} min` : `${fmt(h, 1)} h`;
+async function refreshKpi1() {
+  if (!LIVE) return;
+  try { kpi1 = await api("/api/kpi1"); } catch { kpi1 = null; }
+  if (state.tab === "review") renderTab();
+}
+async function markReview(event, note) {
+  timeError = "";
+  try { await api("/api/time", { task: taskName(), phase: "review", event, note: note || null }); }
+  catch (error) { timeError = `Time not logged: ${error.message}`; }
+  await refreshKpi1();
+}
+function kpi1Section() {
+  if (!kpi1) return "";
+  const rows = kpi1.tasks.map((t) => `<li><b>${esc(t.task)}</b> · ${t.measured ? `${hrs(t.ai_hours)} with Syntera vs ${hrs(t.manual_hours)} manual · ratio ${fmt(t.ratio, 3)}` : `not measured yet · ${hrs(t.manual_hours)} manual`}${t.manual_estimated ? `<br><span class="note">manual hours are estimates</span>` : ""}</li>`).join("");
+  const verdict = kpi1.kpi1_met ? "Met" : kpi1.log_errors.length ? "Log has errors" : kpi1.unmeasured_tasks.length ? "Not every task measured" : "Not met";
+  return `<div class="section-title"><h3>KPI 1</h3><span class="note">${kpi1.ratio == null ? "no tasks measured" : `ratio ${fmt(kpi1.ratio, 3)} · ${verdict}`}</span></div>
+      <ul class="log">${rows}${kpi1.log_errors.map((e) => `<li class="note" style="color:var(--fail)">${esc(e)}</li>`).join("")}</ul>`;
+}
 const clock = (ms) => { const s = Math.floor(ms / 1000); return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`; };
 setInterval(() => { const t = $("#timer"); if (t && reviewStart != null) t.textContent = clock(reviewAccum + Date.now() - reviewStart); }, 500);
 
@@ -575,13 +599,20 @@ function renderTab() {
     $("#spec-reset").addEventListener("click", () => { state.draft = structuredClone(serverConfig); renderTab(); });
   }
   const tb = $("#timer-btn");
-  if (tb) tb.addEventListener("click", () => { if (reviewStart == null) reviewStart = Date.now(); else { reviewAccum += Date.now() - reviewStart; reviewStart = null; } renderTab(); });
+  if (tb) tb.addEventListener("click", () => {
+    if (reviewStart == null) { reviewStart = Date.now(); if (LIVE) markReview("start"); }
+    else { reviewAccum += Date.now() - reviewStart; reviewStart = null; if (LIVE) markReview("stop"); }
+    renderTab();
+  });
+  const taskInput = $("#rev-task");
+  if (taskInput) taskInput.addEventListener("change", () => { const v = taskInput.value.trim(); if (v) store.set("syntera.task", v); });
   document.querySelectorAll("[data-decide]").forEach((b) => b.addEventListener("click", () => {
     const ms = reviewAccum + (reviewStart != null ? Date.now() - reviewStart : 0), name = $("#rev-name").value.trim();
     store.set("syntera.reviewer", name);
     const log = store.get("syntera.review", []);
     log.push({ decision: b.dataset.decide, run: run.name, ms, reviewer: name, notes: $("#rev-notes").value.trim(), at: new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" }) });
     store.set("syntera.review", log.slice(-30));
+    if (LIVE && reviewStart != null) markReview("stop", `${b.dataset.decide}${log.at(-1).notes ? `: ${log.at(-1).notes}` : ""}`);
     reviewStart = null; reviewAccum = 0; renderTab();
   }));
 }

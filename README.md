@@ -130,6 +130,32 @@ report exists, passes and matches the decks. Otherwise the reasons are listed an
 command exits non-zero. `examples/baseline_skid.yaml` is a synthetic reference for CI;
 replace it with figures from the vendor's general-arrangement drawing.
 
+### Logging engineering time (KPI 1)
+
+KPI 1 divides the hours a benchmark task takes with Syntera, review and correction
+included, by the hours the manual workflow takes. Engineers record each phase they work
+on; Syntera records its own compute time when given a log:
+
+```bash
+python -m syntera.cli time start --log outputs/time_log.jsonl --task one-line --phase review
+python -m syntera.cli demo --config examples/demo_skid.yaml --output outputs/demo \
+  --time-log outputs/time_log.jsonl --task one-line
+python -m syntera.cli time stop --log outputs/time_log.jsonl --task one-line --phase review
+python -m syntera.cli kpi1 --log outputs/time_log.jsonl \
+  --baseline examples/manual_baseline.yaml --output outputs/demo
+```
+
+The log is append-only JSON Lines with UTC timestamps. A task's time is the union of its
+intervals, so a review that overlaps a regeneration counts once. `kpi1_report.json` gives
+the hours and ratio per task and pooled over measured tasks, with the SHA-256 of the log
+and the baseline. KPI 1 counts as met only when the log is well formed (every phase
+started once and stopped), every logged task has a manual baseline, every baseline task
+has been measured, and the ratio is below 1. The command exits non-zero on a malformed
+log. In the web application the Review tab's timer and every routing run are logged on
+the server against the chosen benchmark task, and the tab shows the live ratio.
+`examples/manual_baseline.yaml` holds labelled estimates for three benchmark tasks;
+replace them with timed manual hours and set `estimate: false`.
+
 ### Importing equipment geometry from STEP
 
 An obstacle may reference a STEP file instead of an analytical box or cylinder:

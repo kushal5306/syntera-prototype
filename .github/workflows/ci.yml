@@ -19,12 +19,14 @@ jobs:
       - run: ruff check .
       - run: ruff format --check .
       - run: pytest
-      - run: python -m syntera.cli demo --config examples/demo_skid.yaml --output outputs/demo
+      - run: python -m syntera.cli demo --config examples/demo_skid.yaml --output outputs/demo --time-log outputs/time_log.jsonl --task one-line
       - name: Solve demo CalculiX decks and apply acceptance thresholds
         run: |
           (cd outputs/demo/fea && for deck in design_pressure self_weight thermal_rise; do ccx -i "$deck"; done)
           python -m syntera.cli fea-evaluate --config examples/demo_skid.yaml --output outputs/demo
           python -m syntera.cli compare --baseline examples/baseline_skid.yaml --output outputs/demo
+      - name: Dry-run the KPI 1 report on the demo's logged compute time
+        run: python -m syntera.cli kpi1 --log outputs/time_log.jsonl --baseline examples/manual_baseline.yaml --output outputs/demo
 
   container:
     runs-on: ubuntu-latest
