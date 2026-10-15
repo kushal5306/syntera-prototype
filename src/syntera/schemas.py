@@ -247,6 +247,58 @@ class PackageMetrics(StrictModel):
     piping: PipingMetrics | None
 
 
+class CostRates(StrictModel):
+    """Installed piping cost rates; both sides of a comparison are priced with the same rates."""
+
+    cost_per_metre: Annotated[float, Field(ge=0)] = 120.0
+    cost_per_bend: Annotated[float, Field(ge=0)] = 45.0
+    currency: str = Field(default="USD", min_length=1, max_length=8)
+
+
+class BaselineSkid(StrictModel):
+    """The reference (vendor or manual) package that a Syntera design is measured against."""
+
+    title: str = Field(min_length=1)
+    synthetic_data: bool
+    source: str = Field(min_length=1)
+    units: Literal["mm"]
+    package_dimensions_mm: tuple[PositiveMm, PositiveMm, PositiveMm]
+    main_piping_length_mm: PositiveMm
+    main_piping_bends: Annotated[int, Field(ge=0)]
+    rates: CostRates = Field(default_factory=CostRates)
+
+
+class PackageFigures(StrictModel):
+    package_dimensions_mm: Point3
+    package_volume_m3: float
+    footprint_m2: float
+    height_mm: float
+    main_piping_length_mm: float | None
+    main_piping_bends: int | None
+    estimated_piping_cost: float | None
+
+
+class ComparisonReport(StrictModel):
+    """KPI 2 comparison: a size or cost claim counts only when the design is valid."""
+
+    baseline_title: str
+    baseline_synthetic: bool
+    baseline_source: str
+    baseline_sha256: str
+    currency: str
+    baseline: PackageFigures
+    design: PackageFigures
+    package_volume_ratio: float
+    footprint_ratio: float
+    height_ratio: float
+    piping_length_ratio: float | None
+    piping_length_saving_mm: float | None
+    piping_cost_saving: float | None
+    design_valid: bool
+    validity_reasons: list[str]
+    kpi2_met: bool
+
+
 class AssuranceReport(StrictModel):
     route_found: bool
     route_length_mm: float | None

@@ -6,6 +6,7 @@ import argparse
 import sys
 from pathlib import Path
 
+import yaml
 from pydantic import ValidationError
 
 from syntera.analysis.calculix import MANIFEST_FILE, input_sha256
@@ -104,6 +105,30 @@ def run_pid_3d(source: Path, output: Path) -> int:
     return 0 if report.failed == 0 else 2
 
 
+def run_compare(baseline_path: Path, output: Path) -> int:
+    """Compare a stored run with a baseline skid and write ``comparison.json``."""
+    from syntera.reporting.compare import COMPARISON_FILE, compare_run
+
+    report = compare_run(output, baseline_path)
+    write_json(report, output / COMPARISON_FILE)
+    kind = "synthetic" if report.baseline_synthetic else "supplied"
+    print(f"Baseline: {report.baseline_title} ({kind})")
+    print(f"Package volume ratio: {report.package_volume_ratio:.3f} (target < 1)")
+    if report.piping_length_ratio is not None:
+        print(
+            f"Main piping: {report.design.main_piping_length_mm:.1f} mm vs "
+            f"{report.baseline.main_piping_length_mm:.1f} mm "
+            f"(ratio {report.piping_length_ratio:.3f})"
+        )
+    if report.piping_cost_saving is not None:
+        print(f"Estimated piping cost saving: {report.piping_cost_saving:.2f} {report.currency}")
+    print(f"KPI 2: {'MET' if report.kpi2_met else 'NOT MET'}")
+    for reason in report.validity_reasons:
+        print(f"- not counted: {reason}")
+    print(f"Report: {output / COMPARISON_FILE}")
+    return 0 if report.design_valid else 2
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="syntera", description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -135,6 +160,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     pid.add_argument("--input", type=Path, required=True)
     pid.add_argument("--output", type=Path, default=Path("outputs/pid"))
+    comparison = subparsers.add_parser(
+        "compare", help="compare a routed run with a baseline skid (KPI 2 package size)"
+    )
+    comparison.add_argument("--baseline", type=Path, required=True)
+    comparison.add_argument("--output", type=Path, required=True)
     web = subparsers.add_parser("web", help="launch the interactive 3D application")
     web.add_argument("--config", type=Path, default=Path("examples/demo_skid.yaml"))
     web.add_argument("--output", type=Path, default=Path("outputs/web"))
@@ -156,6 +186,8 @@ def main(argv: list[str] | None = None) -> int:
             return run_pid_3d(args.input, args.output)
         if args.command == "drawing-check":
             return run_drawing_check(args.input, args.output, args.options)
+        if args.command == "compare":
+            return run_compare(args.baseline, args.output)
         if args.command == "web":
             import uvicorn
 
@@ -163,7 +195,7 @@ def main(argv: list[str] | None = None) -> int:
 
             uvicorn.run(create_app(args.config, args.output), host=args.host, port=args.port)
             return 0
-    except (OSError, ValidationError, ValueError) as error:
+    except (OSError, ValidationError, ValueError, yaml.YAMLError) as error:
         print(f"Configuration or execution error: {error}", file=sys.stderr)
         return 2
     return 2

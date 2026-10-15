@@ -111,6 +111,25 @@ or a manifest whose input hash no longer matches the configuration and route, fa
 Analysis units are mm, N, s, tonne, MPa, and K: steel density is about
 `7.85e-9` tonne/mm³ and standard gravity is `9810` mm/s².
 
+### Comparing a design with a baseline skid (KPI 2)
+
+A baseline file describes the reference package in millimetres: its overall dimensions,
+main piping length and bends, and the cost rates used to price both sides. After a demo
+run (and, when the config has an `analysis` section, solving the decks and running
+`fea-evaluate`), compare the run with it:
+
+```bash
+python -m syntera.cli compare --baseline examples/baseline_skid.yaml --output outputs/demo
+```
+
+`comparison.json` records the package volume, footprint and height ratios, the main
+piping length ratio and saving, and the estimated piping cost saving, together with the
+baseline file's SHA-256. KPI 2 counts as met only when the volume ratio is below 1 and the
+design is valid: assurance passed and, if FEA decks were generated, their acceptance
+report exists, passes and matches the decks. Otherwise the reasons are listed and the
+command exits non-zero. `examples/baseline_skid.yaml` is a synthetic reference for CI;
+replace it with figures from the vendor's general-arrangement drawing.
+
 ### Importing equipment geometry from STEP
 
 An obstacle may reference a STEP file instead of an analytical box or cylinder:

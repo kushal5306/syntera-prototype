@@ -1,0 +1,16 @@
+# Synthetic reference baseline for the demo skid. It is NOT vendor data.
+# Replace these values with figures read from the vendor's general-arrangement drawing.
+title: Synthetic conventional layout of the demo skid
+synthetic_data: true
+source: >-
+  Synthetic reference for CI and demonstration. Assumes a conventional layout that fills
+  the 600 x 400 x 300 mm frame allocated in examples/demo_skid.yaml and runs the line
+  around the vessel with two extra elevation bends (860 mm, 6 bends).
+units: mm
+package_dimensions_mm: [600, 400, 300]
+main_piping_length_mm: 860
+main_piping_bends: 6
+rates:
+  cost_per_metre: 120
+  cost_per_bend: 45
+  currency: USD
