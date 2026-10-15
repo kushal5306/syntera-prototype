@@ -24,6 +24,7 @@ jobs:
         run: |
           (cd outputs/demo/fea && for deck in design_pressure self_weight thermal_rise; do ccx -i "$deck"; done)
           python -m syntera.cli fea-evaluate --config examples/demo_skid.yaml --output outputs/demo
+          python -m syntera.cli compare --baseline examples/baseline_skid.yaml --output outputs/demo
 
   container:
     runs-on: ubuntu-latest
