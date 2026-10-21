@@ -67,3 +67,32 @@ def test_repeated_execution_is_deterministic(base_data, copy_data):
     assert route(data).model_dump(exclude={"expanded_nodes"}) == route(data).model_dump(
         exclude={"expanded_nodes"}
     )
+
+
+def test_assurance_measures_bend_radius_and_port_position_on_the_solid(base_data, copy_data):
+    import time
+
+    from syntera.geometry.cad import make_tube
+    from syntera.verification.checks import verify_route
+
+    data = copy_data(base_data)
+    data["obstacles"] = [
+        {"type": "box", "name": "block", "center": [120, 100, 80], "size": [40, 80, 80]}
+    ]
+    config = DemoConfig.model_validate(data)
+    result = AStarRouter(OccupancyGrid.from_config(config), config).route()
+    radius = config.tube.outer_diameter / 2
+    good = verify_route(
+        config, result, make_tube(result.points, radius, config.tube.minimum_bend_radius), 0.0
+    )
+    assert good.overall_pass
+    assert good.minimum_generated_bend_radius_mm == config.tube.minimum_bend_radius
+
+    tight = make_tube(result.points, radius, config.tube.minimum_bend_radius * 0.5)
+    report = verify_route(config, result, tight, time.perf_counter())
+    assert not report.overall_pass
+    assert any("measured bend radius" in reason for reason in report.failure_reasons)
+
+    moved = make_tube(result.points, radius, config.tube.minimum_bend_radius).translate((0, 0, 2))
+    report = verify_route(config, result, moved, time.perf_counter())
+    assert not report.start_port_alignment and not report.end_port_alignment

@@ -256,18 +256,52 @@ from a DEXPI (Proteus XML) export, which most P&ID tools can write:
 - The piping graph is reduced to runs between nozzles and battery limits (off-page
   connectors and open ends at the skid edge). Valves, reducers and tees are passed
   through, blind-flanged stubs and drains dropped, and a header with branches is routed
-  as a chain through its terminals.
+  as a chain through its terminals. Where two runs share a nozzle, the second joins the
+  first through a tee: a short branch square to the first pipe, so the two never overlap.
 - Equipment is placed on a grid with 1500 mm access gaps and rearranged by pairwise swaps
-  to shorten connected nozzles. Each nozzle faces what it connects to.
+  to shorten connected nozzles. Each nozzle faces what it connects to, sits on the
+  equipment's actual surface (the curved wall of a tank, not its bounding box) and within
+  its height.
 - Lines are routed largest bore first with OD from the nominal size, bend radius 1.5 x OD
   and clearance half the OD. Each routed pipe is an obstacle for later lines, and every
   route is verified with the exact checks. Lines that cannot be routed are listed.
+- The finished plant is then audited as one assembly (below). If lines are unrouted, the
+  audit fails or a line takes a long detour, the plant is routed again in other line
+  orders (problem lines first, shortest first) and the best pass is kept: fewest
+  unrouted lines, then fewest audit failures, then least pipe. Every pass is listed.
 
 The result is a 3D view, a plant STEP file, `plant_layout.json` (total pipe length, bends,
-cost, footprint) and per-line workbench links. Offline:
+cost, footprint, audit, routing passes) and per-line workbench links. Offline:
 
 ```bash
 python -m syntera.cli pid-3d --input path/to/pid.xml --output outputs/pid
+```
+
+### Design audit of a whole assembly
+
+Per-route checks verify each pipe against what it was routed around. The design audit
+looks at the finished assembly the way a reviewer would: every solid against every other
+solid, with sizes measured from the CAD solids rather than taken from the router. Rules:
+
+| Rule | What is measured |
+| --- | --- |
+| Completeness | every required line has a pipe (P&ID plants) |
+| Clash | exact boolean volume on every pair; joined parts may meet only within one OD of the joint |
+| Clearance | exact surface distance between every unjoined pair with a pipe; max(25 mm, OD/2) by default |
+| Connections | each pipe ends on its port along the port axis, each nozzle touches its equipment, no pipe ends in mid air |
+| Bend radius | major radius of every toroidal face of each pipe solid against 1.5 x OD |
+| Outside diameter | radius of every cylindrical and toroidal face against the line size |
+| Access | at least 800 mm between equipment solids |
+| Open ends (advisory) | imported models: pipe ends that meet nothing (battery limit, vent, drain or a missing joint) |
+| Detour (advisory) | routed length over the axis-aligned port distance above 1.5 |
+
+Every finding names the solids, the measured value, the requirement and a location.
+**Audit STEP assembly** on the Drawings page runs it on any STEP file, for example a
+vendor's skid model: single swept-tube solids up to DN600 are taken as pipe, everything
+else as equipment, and pipe end caps that lie on another solid are its joints. Offline:
+
+```bash
+python -m syntera.cli audit-step --input path/to/assembly.step --output outputs/audit
 ```
 
 ## Architecture
@@ -306,6 +340,10 @@ See [docs/architecture.md](docs/architecture.md) for detail.
   elevation (risers drawn only in elevations are not rebuilt), checks square bends only,
   treats each run separately (other pipes are not obstacles), checks at most six runs,
   and needs nozzles clear of equipment by the required clearance for Syntera to route.
+- The design audit is geometric: it does not check pipe supports and spans, flange
+  ratings, valve access heights, insulation, thermal growth or code stress. STEP audits
+  classify pipe by shape, so a round vessel smaller than the pipe size limit (DN600 by
+  default, `--max-pipe-od`) is taken as pipe.
 - This research prototype is not certified for production or safety-critical use.
 
 ## Next milestones

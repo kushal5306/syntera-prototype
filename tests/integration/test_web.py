@@ -171,3 +171,33 @@ def test_pid_upload_builds_a_proposed_plant(tmp_path, dexpi_xml):
     assert client.get(f"/api/pid/{plant}/route-0/config.json").status_code == 404
     bad = client.post("/api/pid?filename=x.xml", content=b"<svg/>")
     assert bad.status_code == 422 and "PlantModel" in bad.json()["detail"]
+
+
+def test_web_app_audits_an_uploaded_step_assembly(tmp_path):
+    import cadquery as cq
+
+    from syntera.geometry.cad import export_step
+
+    project_root = Path(__file__).resolve().parents[2]
+    client = TestClient(create_app(project_root / "examples" / "demo_skid.yaml", tmp_path / "web"))
+    assert "Audit STEP assembly" in client.get("/drawings").text
+    source = tmp_path / "two-boxes.step"
+    export_step(
+        [
+            cq.Solid.makeBox(1000, 1000, 1000),
+            cq.Solid.makeBox(1000, 1000, 1000).translate((500, 0, 0)),
+        ],
+        source,
+    )
+
+    response = client.post("/api/audit?filename=two-boxes.step", content=source.read_bytes())
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["equipment"] == 2 and body["pipes"] == 0
+    assert body["audit"]["overall_pass"] is False
+    assert len(body["meshes"]) == 2
+    saved = client.get(f"/api/audit/{body['audit_id']}/audit.json").json()
+    assert saved["audit"] == body["audit"]
+    assert client.post("/api/audit?filename=notes.txt", content=b"x").status_code == 422
+    assert client.get("/api/audit/../etc/audit.json").status_code == 404
