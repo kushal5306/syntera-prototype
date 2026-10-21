@@ -25,8 +25,9 @@ from syntera.drawings.intake import (
 from syntera.drawings.models import AssemblyOptions
 from syntera.drawings.piping_check import (
     ASSEMBLY_DIR,
+    ASSEMBLY_FILES,
     LINE_FILES,
-    REPORT_FILE,
+    OTHER_LINE,
     PipingCheckResult,
     check_drawing,
 )
@@ -49,7 +50,8 @@ def assembly_meshes(result: PipingCheckResult) -> list[dict]:
         prefix = f"line-{index + 1}"
         name = result.report.lines[index].name
         for mesh in scene_meshes(line.config, line.assembly, line.optimised_tube):
-            if mesh["kind"] == "obstacle" and index:
+            # other lines' legs are routing obstacles; they are drawn as their own tubes
+            if mesh["kind"] == "obstacle" and (index or mesh["name"].startswith(OTHER_LINE)):
                 continue
             if mesh["kind"] != "obstacle":
                 mesh["id"] = f"{prefix}-{mesh['id']}"
@@ -64,6 +66,18 @@ def assembly_meshes(result: PipingCheckResult) -> list[dict]:
                 f"{name} as drawn",
                 "drawn",
                 line.drawn_tube,
+                DRAWN_TUBE_COLOUR,
+                {"outer_diameter_mm": line.config.tube.outer_diameter},
+                max(0.8, line.config.voxel_resolution / 8.0),
+            )
+            mesh["line"] = index
+            meshes.append(mesh)
+        for number, stub in enumerate(line.stubs, start=1):
+            mesh = shape_mesh(
+                f"{prefix}-nozzle-{number}",
+                f"{name} nozzle",
+                "drawn",
+                stub,
                 DRAWN_TUBE_COLOUR,
                 {"outer_diameter_mm": line.config.tube.outer_diameter},
                 max(0.8, line.config.voxel_resolution / 8.0),
@@ -143,9 +157,10 @@ def drawings_router(root: Path) -> APIRouter:
 
     @router.get("/{drawing_id}/assembly/{name}")
     def assembly_report(drawing_id: str, name: str) -> FileResponse:
-        if not DRAWING_ID.match(drawing_id) or name != REPORT_FILE:
+        if not DRAWING_ID.match(drawing_id) or name not in ASSEMBLY_FILES:
             raise HTTPException(status_code=404, detail="unknown assembly output")
-        return _existing(root / drawing_id / ASSEMBLY_DIR / name, "application/json")
+        return _existing(root / drawing_id / ASSEMBLY_DIR / name, ASSEMBLY_FILES[name],
+                         name if name.endswith(".step") else None)  # fmt: skip
 
     @router.get("/{drawing_id}/assembly/{line}/{name}")
     def assembly_file(drawing_id: str, line: str, name: str) -> FileResponse:

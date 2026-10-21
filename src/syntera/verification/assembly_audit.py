@@ -26,7 +26,7 @@ from syntera.geometry.cad import exact_shape_distance
 from syntera.schemas import Point3
 from syntera.verification.measure import TUBE_FACE_TYPES, measure_tube
 
-Role = Literal["equipment", "pipe", "stub"]
+Role = Literal["equipment", "structure", "pipe", "stub"]
 VOLUME_TOLERANCE_MM3 = 1e-3
 CONTACT_TOLERANCE_MM = 0.5
 DIAMETER_TOLERANCE_MM = 0.05
@@ -171,6 +171,7 @@ def audit_assembly(
     *,
     missing_lines: list[str] | None = None,
     access_gap: float = DEFAULT_ACCESS_GAP_MM,
+    missing_reason: str = "is not routed",
 ) -> AssemblyAudit:
     """Audit every part against every other; see the module docstring for the rules."""
     clash = _Rule(
@@ -409,7 +410,7 @@ def audit_assembly(
                 )
 
     for line in missing_lines or []:
-        complete.findings.append(AuditFinding(parts=[line], message=f"{line} is not routed"))
+        complete.findings.append(AuditFinding(parts=[line], message=f"{line} {missing_reason}"))
     complete.checked = len(missing_lines or []) + sum(part.role == "pipe" for part in parts)
 
     checked = [clash, clearance, connections, bends, diameter, access]
