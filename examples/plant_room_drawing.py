@@ -355,17 +355,17 @@ def _title_block(msp: Modelspace) -> None:
         [(x0, y0), (x1, y0), (x1, y1), (x0, y1)], close=True, dxfattribs={"layer": "G-ANNO-TTLB"}
     )
     msp.add_lwpolyline(
-        [(x1 - 7000, y0), (x1, y0), (x1, y0 + 1600), (x1 - 7000, y0 + 1600)], close=True,
+        [(x1 - 8600, y0), (x1, y0), (x1, y0 + 1600), (x1 - 8600, y0 + 1600)], close=True,
         dxfattribs={"layer": "G-ANNO-TTLB"},
     )  # fmt: skip
     rows = [
         "SOLVENT RECOVERY UNIT - AREA 200 PUMP ROOM",
         "PIPING GENERAL ARRANGEMENT - PLAN AND SECTION A-A",
-        "DWG 200-PI-GA-001 REV B   SCALE 1:50   UNITS: MM, ELEVATIONS IN M",
+        "DWG 200-PI-GA-001 REV B  SCALE 1:50  MM, EL IN M",
         "SYNTHETIC TEST DRAWING - NOT FOR CONSTRUCTION",
     ]
     for index, row in enumerate(rows):
-        _text(msp, row, (x1 - 6800, y0 + 1300 - index * 330), "G-ANNO-TTLB", 160, 0,
+        _text(msp, row, (x1 - 8400, y0 + 1300 - index * 330), "G-ANNO-TTLB", 140, 0,
               TextEntityAlignment.MIDDLE_LEFT)  # fmt: skip
     notes = [
         "NOTES:",

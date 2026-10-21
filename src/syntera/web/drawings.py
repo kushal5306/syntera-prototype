@@ -41,6 +41,9 @@ DRAWING_FILES = {
 }
 LINE_FOLDER = re.compile(r"^line-[1-9][0-9]?$")
 DRAWN_TUBE_COLOUR = (0.93, 0.62, 0.16)
+# Round vessels would otherwise share the pipes' orange; columns and steel are grey.
+EQUIPMENT_COLOUR = (0.88, 0.34, 0.25)
+STRUCTURE_COLOUR = (0.62, 0.65, 0.70)
 
 
 def assembly_meshes(result: PipingCheckResult) -> list[dict]:
@@ -53,6 +56,9 @@ def assembly_meshes(result: PipingCheckResult) -> list[dict]:
             # other lines' legs are routing obstacles; they are drawn as their own tubes
             if mesh["kind"] == "obstacle" and (index or mesh["name"].startswith(OTHER_LINE)):
                 continue
+            if mesh["kind"] == "obstacle":
+                structure = mesh["name"] in result.structures
+                mesh["color"] = STRUCTURE_COLOUR if structure else EQUIPMENT_COLOUR
             if mesh["kind"] != "obstacle":
                 mesh["id"] = f"{prefix}-{mesh['id']}"
                 mesh["name"] = f"{name} {mesh['name'].lower()}"

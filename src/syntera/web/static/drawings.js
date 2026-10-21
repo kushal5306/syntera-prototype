@@ -223,7 +223,7 @@ function checkSection(s) {
     FIELDS.map(([key, label]) => el("label", {}, label, el("input", { name: key, type: "number", min: "0", step: "any", placeholder: "from drawing", value: state.options[key] ?? "" }))),
     el("label", {}, "Currency", el("input", { name: "currency", maxlength: "8", value: state.options.currency ?? "USD" })),
     COSTS.map(([key, label, value]) => el("label", {}, label, el("input", { name: key, type: "number", min: "0", step: "any", value: state.options[key] ?? value }))),
-    el("label", { class: "wide" }, el("input", { name: "optimise", type: "checkbox", ...((state.options.optimise ?? true) ? { checked: "" } : {}) }), " Also route each line to look for a shorter verified route (slower on big drawings)"),
+    el("label", { class: "wide check" }, el("input", { name: "optimise", type: "checkbox", ...((state.options.optimise ?? true) ? { checked: "" } : {}) }), " Also route each line to look for a shorter verified route (slower on big drawings)"),
     el("label", { class: "wide" }, "Layer roles (layer=equipment, pipe, pipe_centreline, nozzle, structure, frame or ignore)",
       el("input", { name: "layer_roles", placeholder: "e.g. M-EQPT=equipment, P-PIPE=pipe", value: Object.entries(state.options.layer_roles || {}).map(([k, v]) => `${k}=${v}`).join(", ") })));
   const result = el("div", { id: "check-result" });
@@ -274,7 +274,9 @@ async function runCheck(drawingId) {
 
 const metres = (mm) => (mm === null || mm === undefined ? "–" : `${fmt(mm / 1000, 2)} m`);
 const money = (report, value) => (value === null || value === undefined ? "–" : `${report.currency} ${fmt(value, 0)}`);
-const verdict = (route) => el("span", { class: `chip ${route.assurance_pass ? "pass" : "fail"}` }, route.assurance_pass ? "pass" : "fail");
+const notRun = (route) => (route.failure_reasons[0] || "").startsWith("not requested");
+const verdict = (route) => notRun(route) ? el("span", { class: "chip warn" }, "not run")
+  : el("span", { class: `chip ${route.assurance_pass ? "pass" : "fail"}` }, route.assurance_pass ? "pass" : "fail");
 
 function renderCheck(r) {
   if (!r.supported) return [el("div", { class: "reason soft" }, r.message)];

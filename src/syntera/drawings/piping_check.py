@@ -88,6 +88,7 @@ class LineGeometry:
 class PipingCheckResult:
     report: PipingCheckReport
     lines: list[LineGeometry]
+    structures: tuple[str, ...] = ()  # obstacle names that are columns or steel
 
 
 def voxel_resolution(dimensions: Point3, max_voxels: int = MAX_VOXELS) -> float:
@@ -349,7 +350,7 @@ def check_drawing(
         json.dumps(report.model_dump(mode="json"), indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
-    return PipingCheckResult(report=report, lines=geometries)
+    return PipingCheckResult(report=report, lines=geometries, structures=tuple(layout.structures))
 
 
 def _on_path(point: Point3, points: list[Point3], tolerance: float) -> bool:
