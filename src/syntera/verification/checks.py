@@ -9,6 +9,9 @@ import cadquery as cq
 
 from syntera.geometry.cad import exact_shape_distance, obstacle_shape
 from syntera.schemas import AssuranceReport, DemoConfig, Point3, RouteResult
+from syntera.verification.measure import TubeMeasurement, measure_tube
+
+PORT_POSITION_TOLERANCE_MM = 0.5
 
 
 def _unit(start: Point3, end: Point3) -> Point3:
@@ -22,6 +25,15 @@ def _aligned(actual: Point3, expected: Point3, tolerance: float = 1e-8) -> bool:
 
 def _bend_count(points: list[Point3]) -> int:
     return max(0, len(points) - 2)
+
+
+def _cap_at(measured: TubeMeasurement, position: Point3, outward: Point3) -> bool:
+    """True when the solid has an end cap centred on ``position`` facing ``outward``."""
+    return any(
+        math.dist(end.centre, position) <= PORT_POSITION_TOLERANCE_MM
+        and _aligned(end.normal, outward, 1e-6)
+        for end in measured.ends
+    )
 
 
 def failed_report(config: DemoConfig, route: RouteResult, elapsed: float) -> AssuranceReport:
@@ -62,11 +74,22 @@ def verify_route(
     collision_free = boundary_clearance >= -1e-7 and all(
         tube.intersect(shape).Volume() <= 1e-7 for shape in obstacle_shapes
     )
-    start_alignment = _aligned(_unit(route.points[0], route.points[1]), config.start_port.direction)
+    # Ports are checked on the solid itself: an end cap must sit on each port and face away
+    # from the tube along the port axis, and bend radii are read from the toroidal faces.
+    measured = measure_tube(tube)
+    start_direction = config.start_port.direction
+    backwards = tuple(-value for value in start_direction)
+    start_alignment = _aligned(
+        _unit(route.points[0], route.points[1]), start_direction
+    ) and _cap_at(measured, config.start_port.position, backwards)  # type: ignore[arg-type]
     approach = _unit(route.points[-2], route.points[-1])
     end_expected = tuple(-value for value in config.end_port.direction)
-    end_alignment = _aligned(approach, end_expected)  # type: ignore[arg-type]
-    generated_radius = config.tube.minimum_bend_radius if _bend_count(route.points) else None
+    end_alignment = _aligned(approach, end_expected) and _cap_at(  # type: ignore[arg-type]
+        measured,
+        config.end_port.position,
+        end_expected,  # type: ignore[arg-type]
+    )
+    generated_radius = measured.minimum_bend_radius
 
     reasons: list[str] = []
     if not collision_free:
@@ -76,12 +99,17 @@ def verify_route(
             f"measured clearance {minimum_clearance:.3f} mm is below required "
             f"{config.tube.minimum_clearance:.3f} mm"
         )
-    if generated_radius is not None and generated_radius + 1e-7 < config.tube.minimum_bend_radius:
-        reasons.append("generated bend radius is below the specified minimum")
+    if _bend_count(route.points) and generated_radius is None:
+        reasons.append("the route turns but the solid has no circular bend faces (kinked tube)")
+    if generated_radius is not None and generated_radius + 1e-6 < config.tube.minimum_bend_radius:
+        reasons.append(
+            f"measured bend radius {generated_radius:.3f} mm is below the specified minimum "
+            f"{config.tube.minimum_bend_radius:.3f} mm"
+        )
     if not start_alignment:
-        reasons.append("tube is not aligned with the start port direction")
+        reasons.append("tube does not start on the start port along its direction")
     if not end_alignment:
-        reasons.append("tube is not aligned with the end port direction")
+        reasons.append("tube does not end on the end port along its direction")
 
     return AssuranceReport(
         route_found=True,

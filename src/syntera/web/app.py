@@ -29,6 +29,7 @@ from syntera.reporting.timelog import (
     task_hours,
 )
 from syntera.schemas import DemoConfig, Label, StepObstacle, TimeActor
+from syntera.web.audit import audit_router
 from syntera.web.drawings import drawings_router
 from syntera.web.mesh import scene_meshes
 from syntera.web.pid import pid_router
@@ -109,6 +110,7 @@ def create_app(
     app.mount("/assets", StaticFiles(directory=static), name="assets")
     app.include_router(drawings_router(output_root / "drawings"))
     app.include_router(pid_router(output_root / "pid"))
+    app.include_router(audit_router(output_root / "audit"))
 
     def checked(config: DemoConfig) -> DemoConfig:
         """Only STEP files named by the server-side config may be opened from a request."""

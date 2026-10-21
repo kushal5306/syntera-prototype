@@ -258,6 +258,53 @@ def _stand_off(outer_diameter: float, step: float) -> float:
     return (math.floor(needed / step) + 1) * step
 
 
+def _surface_reach(owner: PlacedEquipment, axis: int, face: list[float]) -> float:
+    """Distance from the centre to the equipment surface along ``axis`` through ``face``.
+
+    A box face is flat. A cylinder's curved wall is closer to the centre line the further the
+    nozzle sits off it, so the flange is put on the wall itself, not on the bounding box.
+    """
+    half = owner.size[axis] / 2
+    if owner.shape != "cylinder":
+        return half
+    length_axis = 0 if owner.axis == "x" else 2
+    if axis == length_axis:
+        return half  # flat end cap
+    radius = owner.size[1] / 2 if owner.axis == "x" else owner.size[0] / 2
+    off = [i for i in range(3) if i not in (axis, length_axis)][0]
+    offset = face[off] - owner.center[off]
+    return math.sqrt(max(radius**2 - offset**2, 0.0))
+
+
+def _nozzle_levels(
+    owner: PlacedEquipment, axis: int, outer: float, rows: int, step: float
+) -> list[float]:
+    """Grid heights for ``rows`` rows of nozzles that keep every nozzle on the equipment.
+
+    Rows sit as close as possible to the preferred height (mid-height, at most 800 mm up),
+    two grid steps apart where the face is tall enough, else one step apart.
+    """
+    base = owner.center[2] - owner.size[2] / 2
+    low, high = base + outer / 2, base + owner.size[2] - outer / 2
+    if owner.shape == "cylinder" and owner.axis == "x":
+        radius = owner.size[1] / 2
+        low, high = owner.center[2] - radius + outer / 2, owner.center[2] + radius - outer / 2
+    preferred = _snap(base + min(owner.size[2] / 2, 800.0), step)
+    grid = [
+        k * step for k in range(math.ceil(low / step - 1e-9), math.floor(high / step + 1e-9) + 1)
+    ]
+    grid.sort(key=lambda z: (abs(z - preferred), z))
+    for gap in (2 * step, step):
+        chosen: list[float] = []
+        for z in grid:
+            if all(abs(z - other) >= gap - 1e-9 for other in chosen):
+                chosen.append(z)
+            if len(chosen) == rows:
+                return sorted(chosen, key=lambda z: (abs(z - preferred), z))
+    # More rows than fit: keep stacking upwards; the assembly audit reports the overflow.
+    return [preferred + row * 2 * step for row in range(rows)]
+
+
 def _nozzle_ports(
     document: PidDocument,
     placed: dict[str, PlacedEquipment],
@@ -300,17 +347,18 @@ def _nozzle_ports(
         owner = placed[equipment_id]
         axis = 0 if direction[0] else 1
         tangent = 1 - axis
-        half = owner.size[axis] / 2
         nozzles.sort(key=lambda n: (targets[n][tangent], n))
         spacing = 2 * step
         usable = max(1, min(len(nozzles), int((owner.size[tangent] - step) // spacing) + 1))
+        levels = _nozzle_levels(
+            owner, axis, max(ods[n] for n in nozzles), -(-len(nozzles) // usable), step
+        )
         for index, nozzle in enumerate(nozzles):
             offset = ((index % usable) - (usable - 1) / 2) * spacing
-            base = owner.center[2] - owner.size[2] / 2
-            z = _snap(base + min(owner.size[2] / 2, 800.0) + (index // usable) * spacing, step)
+            z = levels[index // usable]
             face = [0.0, 0.0, z]
-            face[axis] = owner.center[axis] + direction[axis] * half
             face[tangent] = _snap(owner.center[tangent] + offset, step)
+            face[axis] = owner.center[axis] + direction[axis] * _surface_reach(owner, axis, face)
             port = list(face)
             reach = face[axis] + direction[axis] * _stand_off(ods[nozzle], step)
             port[axis] = (

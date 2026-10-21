@@ -363,7 +363,7 @@ const model = (() => {
       world.add(new THREE.Mesh(geom, mat));
       bounds.expandByPoint(new THREE.Vector3(...m.bounds.min)); bounds.expandByPoint(new THREE.Vector3(...m.bounds.max));
     });
-    const ws = payload.report.workspace_mm;
+    const ws = payload.report && payload.report.workspace_mm;
     if (ws) {
       const frame = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(...ws)), new THREE.LineBasicMaterial({ color: 0x8b9aa3 }));
       frame.position.set(ws[0] / 2, ws[1] / 2, ws[2] / 2); world.add(frame);
@@ -447,12 +447,82 @@ function renderPlant(payload) {
         el("td", { class: "r num" }, route.length_mm === null ? "–" : `${fmt(route.length_mm / 1000, 2)} m`),
         el("td", {}, el("span", { class: `chip ${route.assurance_pass ? "pass" : "fail"}` }, route.assurance_pass ? "pass" : "not routed")))))),
     r.failed ? el("div", { class: "reason soft" }, `${r.failed} line(s) could not be routed in this layout: ${r.routes.filter((x) => !x.routed).map((x) => `${x.line} (${x.failure_reasons[0] || "no route"})`).join("; ")}.`) : null,
+    ...renderAudit(r),
     section("Equipment", `${r.equipment.length}`, table([["Tag"], ["Class"], ["Size, mm"], ["Source"]],
       r.equipment.map((e) => el("tr", { title: e.size_note }, el("td", {}, e.tag), el("td", { class: "cell-text" }, e.component_class),
         el("td", { class: "num" }, e.size.map((v) => fmt(v, 0)).join(" × ")),
         el("td", {}, el("span", { class: `chip ${e.size_source === "pid" ? "pass" : "warn"}` }, e.size_source === "pid" ? "P&ID" : "default")))))),
     section("What was assumed", null, el("ul", { class: "findings" }, [...r.assumptions, ...r.skipped].map((text) => el("li", {}, text)))),
   ].filter(Boolean);
+}
+
+// ---- any STEP assembly: whole-assembly design audit ----
+async function uploadAudit(file) {
+  busy("Reading every solid and checking each pair. Large assemblies take a minute or two…");
+  try {
+    const payload = await api(`/api/audit?filename=${encodeURIComponent(file.name)}`, {
+      method: "POST", headers: { "Content-Type": "application/step" }, body: file,
+    });
+    state.summary = null;
+    state.check = null;
+    document.querySelectorAll("#drawing-list li").forEach((li) => li.setAttribute("aria-selected", "false"));
+    $("drop").hidden = true;
+    $("details").replaceChildren(
+      section("Design audit of a STEP assembly", null, el("p", { class: "note" },
+        "Solids that are a single swept tube up to DN600 are treated as pipe; everything else as equipment. Red solids are named in a failing finding.")),
+      kv([
+        ["File", payload.filename],
+        ["Pipe solids", fmt(payload.pipes, 0)],
+        ["Other solids", fmt(payload.equipment, 0)],
+        ["Pipe ODs, mm", payload.sizes_mm.map((v) => fmt(v, 1)).join(", ") || "–"],
+      ]),
+      el("div", { class: "row wrap" }, el("a", { class: "btn", href: `/api/audit/${payload.audit_id}/audit.json` }, "Audit JSON")),
+      ...renderAudit({ audit: payload.audit }, "Result"));
+    $("mode-3d").disabled = false;
+    $("mode-2d").disabled = true;
+    $("legend-drawn").hidden = true;
+    model.load(payload);
+    setMode("3d");
+    $("units-foot").textContent = "millimetres · Z up · drag to orbit";
+  } catch (error) {
+    $("details").replaceChildren(el("div", { class: "reason" }, `Could not audit ${file.name}: ${error.message}`));
+  } finally {
+    $("busy").hidden = true;
+  }
+}
+
+// The whole-assembly design audit and, for a plant, the routing orders the optimiser tried.
+function renderAudit(r, title = "Design audit") {
+  const a = r.audit;
+  if (!a) return [];
+  const chip = { pass: "pass", fail: "fail", advisory: "warn" };
+  const findings = a.rules.flatMap((rule) => rule.findings.map((f) => ({ rule, f })));
+  const parts = [
+    section(title, `${a.parts} solids`, el("p", { class: "note" },
+      "Every solid checked against every other one, with sizes measured from the CAD solids themselves. ",
+      el("strong", {}, a.summary), ".")),
+    table([["Rule"], ["Checked", "r"], ["Result"]], a.rules.map((rule) => el("tr", { title: rule.basis },
+      el("td", {}, rule.title),
+      el("td", { class: "r num" }, fmt(rule.checked, 0)),
+      el("td", {}, el("span", { class: `chip ${chip[rule.status]}` },
+        rule.status === "pass" ? "pass" : `${rule.findings.length} ${rule.status === "fail" ? "fail" : "to review"}`))))),
+  ];
+  if (findings.length) {
+    parts.push(el("ul", { class: "findings" }, findings.map(({ rule, f }) =>
+      el("li", { class: rule.status === "fail" ? "fail" : "" }, `${rule.status === "fail" ? "Fail" : "Review"}: ${f.message}`))));
+  }
+  if (r.optimisation && r.optimisation.length > 1) {
+    parts.push(section("Optimisation", "rip-up and reroute", el("p", { class: "note" },
+      "The plant was routed again in other line orders. The kept pass has the fewest unrouted lines, then the fewest audit failures, then the least pipe."),
+      table([["Order"], ["Routed", "r"], ["Audit", "r"], ["Pipe", "r"], ["Bends", "r"]], r.optimisation.map((t) =>
+        el("tr", { class: t.chosen ? "chosen" : "" },
+          el("td", {}, t.strategy.replaceAll("-", " "), t.chosen ? el("span", { class: "chip pass" }, "kept") : null),
+          el("td", { class: "r num" }, `${t.routed}/${t.routed + t.failed}`),
+          el("td", { class: "r num" }, t.audit_pass ? "pass" : `${t.audit_findings} fail`),
+          el("td", { class: "r num" }, `${fmt(t.total_pipe_length_mm / 1000, 1)} m`),
+          el("td", { class: "r num" }, fmt(t.total_bends, 0)))))));
+  }
+  return parts;
 }
 
 // ---- loading ----
@@ -507,6 +577,11 @@ async function upload(file) {
 
 async function init() {
   bindSheet();
+  $("audit-input").addEventListener("change", (event) => {
+    const file = event.target.files[0];
+    if (file) uploadAudit(file);
+    event.target.value = "";
+  });
   $("pid-input").addEventListener("change", (event) => {
     const file = event.target.files[0];
     if (file) uploadPid(file);
