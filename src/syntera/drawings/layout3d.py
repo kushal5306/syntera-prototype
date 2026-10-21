@@ -14,12 +14,14 @@ import math
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass, field
+from typing import Literal
 
 from ezdxf import bbox
 from ezdxf.document import Drawing
 from ezdxf.entities import DXFGraphic
 from ezdxf.path import make_path
 
+from syntera.drawings.annotations import Elevation, LineNumber, parse_elevation, parse_line_number
 from syntera.drawings.models import (
     AssemblyOptions,
     Assumption,
@@ -34,8 +36,17 @@ Rect = tuple[float, float, float, float]  # x0, y0, x1, y1
 DEFAULT_EQUIPMENT_HEIGHT_MM = 1000.0
 DEFAULT_PIPE_ELEVATION_MM = 500.0
 DEFAULT_OUTER_DIAMETER_MM = 60.3  # DN50
-MAX_LINES = 6
+MAX_LINES = 40
 ORIGIN_STEP_MM = 100.0
+# Flange face of a nozzle stands this far off the equipment surface where the drawing does
+# not say (a typical DN25-DN150 nozzle projection).
+NOZZLE_PROJECTION_MM = 150.0
+# How far a line number or elevation label may sit from the run it describes.
+LABEL_REACH_MM = 1000.0
+# A run ending this close to the room or skid limit is taken to leave it (battery limit).
+BATTERY_LIMIT_REACH_MM = 500.0
+# Equipment tags such as T-201, P-201A, E220: preferred over other text inside an outline.
+EQUIPMENT_TAG = re.compile(r"^[A-Z]{1,4}-?\d{2,5}[A-Z]?$")
 
 # Checked in this order; the first matching word decides the layer's role.
 ROLE_WORDS: tuple[tuple[LayerRole, tuple[str, ...]], ...] = (
@@ -47,7 +58,9 @@ ROLE_WORDS: tuple[tuple[LayerRole, tuple[str, ...]], ...] = (
         "equipment",
         ("EQUIP", "EQPM", "VESSEL", "TANK", "PUMP", "COMPRESSOR", "EXCHANGER", "FILTER"),
     ),
-    ("frame", ("FRAME", "BORDER", "WORKSPACE", "SKID")),
+    # Building columns and steel are obstacles; walls bound the room like a skid frame.
+    ("structure", ("S-COLS", "COLUMN", "STRUCT", "STEEL", "S-BEAM", "S-COLM")),
+    ("frame", ("FRAME", "BORDER", "WORKSPACE", "SKID", "WALL")),
 )
 SCHEMATIC_WORDS = re.compile(r"P\s*&\s*ID|P&AMP;ID|PIPING AND INSTRUMENT|PFD|FLOW DIAGRAM")
 TEXT_VALUES = {
@@ -57,13 +70,36 @@ TEXT_VALUES = {
 }
 
 
+EndKind = Literal["nozzle", "tee", "battery_limit", "open"]
+
+
+@dataclass(frozen=True)
+class LineEnd:
+    """How one end of a drawn run is connected.
+
+    ``port`` is where the pipe itself starts (a nozzle's flange face, a tee point on the
+    header centreline, or the drawn end) and ``direction`` is the way the pipe leaves it.
+    """
+
+    kind: EndKind
+    port: Point3
+    direction: Point3
+    equipment: str | None = None
+    face: Point3 | None = None  # where a nozzle stub meets the equipment surface
+    note: str = ""
+
+
 @dataclass(frozen=True)
 class DrawnLine:
-    """A pipe run as drawn: its plan path at one elevation, as corner points in mm."""
+    """A pipe run as drawn, port to port, as corner points in mm (risers included)."""
 
     name: str
     points: list[Point3]
     orthogonal: bool
+    tube: TubeSpecification | None = None
+    line_number: str | None = None
+    ends: tuple[LineEnd, ...] = ()
+    problems: tuple[str, ...] = ()  # why the run cannot be built as drawn
 
 
 @dataclass
@@ -77,6 +113,7 @@ class InferredLayout:
     tube: TubeSpecification | None = None
     assumptions: list[Assumption] = field(default_factory=list)
     views: list[str] = field(default_factory=list)
+    structures: list[str] = field(default_factory=list)  # obstacle names that are structure
 
 
 @dataclass(frozen=True)
@@ -167,7 +204,10 @@ def _items(doc: Drawing, scale: float, overrides: dict[str, LayerRole]) -> list[
 
 
 def _view_frames(items: list[_Item], texts: list[_Text], scale: float) -> dict[str, Rect]:
-    """Find labelled views: the closest rectangle directly below a PLAN/ELEVATION title."""
+    """Find labelled views: the closest rectangle directly below or above a view title.
+
+    Syntera's own drawings title a view above it; most drawing standards title it below.
+    """
     rectangles: list[Rect] = []
     for item in items:
         outline = _closed_outline(item.entity)
@@ -175,23 +215,24 @@ def _view_frames(items: list[_Item], texts: list[_Text], scale: float) -> dict[s
             rectangles.append(item.box)
     labels = {
         "plan": re.compile(r"\bPLAN\b"),
-        "front": re.compile(r"\bFRONT\b"),
+        "front": re.compile(r"\bFRONT\b|^SECTION\b|^ELEVATION\b"),
         "side": re.compile(r"\b(RIGHT|LEFT|SIDE|END)\b.*\bELEVATION\b"),
     }
     frames: dict[str, Rect] = {}
     for view, pattern in labels.items():
-        for text in sorted(texts, key=lambda t: (t.at[1], t.at[0])):
+        # the title nearest its view wins, so a title-block line naming the views loses
+        gaps = []
+        for text in texts:
             if not pattern.search(text.text.upper()):
                 continue
-            candidates = [
-                rect
-                for rect in rectangles
-                if rect[0] <= text.at[0] <= rect[2]
-                and 0 <= text.at[1] - rect[3] <= 0.5 * (rect[3] - rect[1])
-            ]
-            if candidates:
-                frames[view] = min(candidates, key=lambda rect: (text.at[1] - rect[3], rect))
-                break
+            for rect in rectangles:
+                if rect in frames.values() or not rect[0] <= text.at[0] <= rect[2]:
+                    continue
+                for gap in (text.at[1] - rect[3], rect[1] - text.at[1]):
+                    if 0 <= gap <= 0.5 * (rect[3] - rect[1]):
+                        gaps.append((gap, rect))
+        if gaps:
+            frames[view] = min(gaps)[1]
     return frames
 
 
@@ -349,10 +390,15 @@ def is_orthogonal(points: list[Point3]) -> bool:
 
 
 def _label_inside(texts: Iterable[_Text], rect: Rect, used: set[str]) -> str | None:
-    for text in sorted(texts, key=lambda t: (t.at[1], t.at[0], t.text)):
-        if _inside(text.at, rect) and text.text not in used and len(text.text) <= 60:
-            return text.text
-    return None
+    """An equipment tag inside the outline if there is one, else the lowest short text."""
+    inside = [
+        t
+        for t in sorted(texts, key=lambda t: (t.at[1], t.at[0], t.text))
+        if _inside(t.at, rect) and t.text not in used and len(t.text) <= 60
+    ]
+    tags = [t for t in inside if EQUIPMENT_TAG.match(t.text.upper())]
+    chosen = tags or inside
+    return chosen[0].text if chosen else None
 
 
 def _source(user_value: float | None, drawing_value: float | None) -> str:
@@ -519,15 +565,17 @@ def infer_layout(
     def local(point: Point2) -> Point2:
         return (point[0] - origin[0], point[1] - origin[1])
 
-    def front_z_range(x0: float, x1: float) -> tuple[float, float] | None:
-        """Vertical extent of the front-elevation equipment spanning the same X range."""
+    def front_z_range(
+        x0: float, x1: float, role: LayerRole = "equipment"
+    ) -> tuple[float, float] | None:
+        """Vertical extent of the front-elevation items of ``role`` spanning the same X range."""
         if front is None:
             return None
         tolerance = max(1.0, 0.01 * (x1 - x0))
         spans = [
             (i.box[1] - front[1], i.box[3] - front[1])
             for i in front_items
-            if i.role == "equipment"
+            if i.role == role
             and abs(i.box[0] - front[0] - x0) <= tolerance
             and abs(i.box[2] - front[0] - x1) <= tolerance
         ]
@@ -611,10 +659,13 @@ def infer_layout(
     centreline = [i for i in plan_items if i.role == "pipe_centreline"]
     pipe_items = centreline or [i for i in plan_items if i.role == "pipe"]
     tolerance = max(0.5, od * 0.05)
-    pieces = [
-        [local(p) for p in _flatten(i.entity, scale, max(0.05, radius * 0.02))]
-        for i in sorted(pipe_items, key=lambda i: (i.box, i.entity.dxf.handle))
-    ]
+    pieces = []
+    for item in sorted(pipe_items, key=lambda i: (i.box, i.entity.dxf.handle)):
+        piece = [local(p) for p in _flatten(item.entity, scale, max(0.05, radius * 0.02))]
+        # a closed curve on a pipe layer is a symbol (riser, cap, reducer), not a run
+        if len(piece) > 2 and math.dist(piece[0], piece[-1]) <= tolerance:
+            continue
+        pieces.append(piece)
     runs = [
         run
         for run in _chains(pieces, tolerance)
@@ -632,41 +683,183 @@ def infer_layout(
             )
         )
         runs = runs[:MAX_LINES]
-
-    elevation, elevation_source = options.pipe_elevation_mm, "user"
-    lines: list[DrawnLine] = []
-    for index, run in enumerate(runs):
+    plans = []
+    for run in runs:
         corners = corner_points(run, radius * 0.3, tolerance)
         if len(corners) < 2:
             continue
         if corners[-1] < corners[0]:
             corners.reverse()
-        if elevation is None and front is not None:
-            front_nozzles = sorted(
-                (i for i in front_items if i.role == "nozzle" and i.entity.dxftype() == "CIRCLE"),
-                key=lambda i: i.centre,
-            )
+        plans.append(corners)
+
+    # ---- line numbers and elevations written beside the runs ----
+    equipment_boxes = [i.box for i in plan_items if i.role == "equipment"]
+    numbers: dict[int, list[tuple[float, LineNumber]]] = {}
+    levels: dict[tuple[int, int], list[tuple[float, Elevation]]] = {}
+    for text in plan_texts:
+        number = parse_line_number(text.text)
+        level = parse_elevation(text.text)
+        if level is not None and any(_inside(text.at, box) for box in equipment_boxes):
+            level = None  # TOP EL inside an outline describes the equipment, not a pipe
+        if number is None and level is None:
+            continue
+        nearest = _nearest_segment(plans, local(text.at))
+        if nearest is None or nearest[0] > LABEL_REACH_MM:
+            continue
+        distance, run_index, segment = nearest
+        if number is not None:
+            numbers.setdefault(run_index, []).append((distance, number))
+        if level is not None:
+            levels.setdefault((run_index, segment), []).append((distance, level))
+
+    fallback = options.pipe_elevation_mm
+    fallback_source = "user"
+    if fallback is None and front is not None:
+        front_nozzles = sorted(
+            (i for i in front_items if i.role == "nozzle" and i.entity.dxftype() == "CIRCLE"),
+            key=lambda i: i.centre,
+        )
+        for corners in plans:
             for nozzle in front_nozzles:
                 if abs(nozzle.centre[0] - front[0] - corners[0][0]) <= tolerance:
-                    elevation, elevation_source = nozzle.centre[1] - front[1], "drawing"
+                    fallback, fallback_source = nozzle.centre[1] - front[1], "drawing"
                     break
-        z = elevation if elevation is not None else DEFAULT_PIPE_ELEVATION_MM
-        points3 = [(round(x, 6), round(y, 6), round(z, 6)) for x, y in corners]
-        lines.append(
-            DrawnLine(name=f"Line {index + 1}", points=points3, orthogonal=is_orthogonal(points3))
+            if fallback is not None:
+                break
+    if fallback is None:
+        fallback, fallback_source = DEFAULT_PIPE_ELEVATION_MM, "default"
+
+    specs: list[tuple[str | None, TubeSpecification]] = []
+    paths: list[list[Point3]] = []
+    labelled_levels = 0
+    for index, corners in enumerate(plans):
+        number = min(numbers[index], key=lambda pair: pair[0])[1] if index in numbers else None
+        line_od = (
+            options.outer_diameter_mm
+            or (number.outer_diameter_mm if number else None)
+            or drawn_od
+            or DEFAULT_OUTER_DIAMETER_MM
         )
-    if elevation is None:
-        elevation_source = "default"
-    pipe_z = elevation if elevation is not None else DEFAULT_PIPE_ELEVATION_MM
+        line_radius = max(options.bend_radius_mm or drawn_radius or 1.5 * line_od, line_od / 2)
+        line_clearance = (
+            options.clearance_mm
+            if options.clearance_mm is not None
+            else drawn_clearance
+            if drawn_clearance is not None
+            else line_od / 2
+        )
+        spec = TubeSpecification(
+            outer_diameter=line_od,
+            minimum_bend_radius=line_radius,
+            minimum_clearance=line_clearance,
+        )
+        specs.append((number.text if number else None, spec))
+        heights: list[float | None] = []
+        for segment in range(len(corners) - 1):
+            found = levels.get((index, segment))
+            if options.pipe_elevation_mm is None and found:
+                heights.append(min(found, key=lambda pair: pair[0])[1].centreline(line_od))
+                labelled_levels += 1
+            else:
+                heights.append(None)
+        paths.append(_rise(corners, _fill(heights, fallback)))
+
+    lines: list[DrawnLine] = []
+    battery = (extent[0], extent[1])
+    connectors = [
+        (i.box[0] - origin[0], i.box[1] - origin[1], i.box[2] - origin[0], i.box[3] - origin[1])
+        for i in plan_items
+        if i.role == "nozzle"
+    ]
+    for index, path in enumerate(paths):
+        number, spec = specs[index]
+        ends: list[LineEnd] = []
+        problems: list[str] = []
+        for reverse in (False, True):
+            path = list(reversed(path)) if reverse else path
+            path, end, problem = _attach(
+                path, index, paths, obstacles, battery, connectors, spec, tolerance
+            )
+            path = list(reversed(path)) if reverse else path
+            ends.append(end)
+            problems += [problem] if problem else []
+        points3 = [(round(x, 6), round(y, 6), round(z, 6)) for x, y, z in path]
+        lines.append(
+            DrawnLine(
+                name=number or f"Line {index + 1}",
+                points=points3,
+                orthogonal=is_orthogonal(points3),
+                tube=spec,
+                line_number=number,
+                ends=tuple(ends),
+                problems=tuple(problems),
+            )
+        )
+    named = [line.line_number for line in lines if line.line_number]
+    if named:
+        assumptions[:] = [
+            a.model_copy(update={"note": (a.note + " Used for runs with no line number.").strip()})
+            if a.quantity in {"Pipe outside diameter", "Bend radius", "Required clearance"}
+            else a
+            for a in assumptions
+        ]
+        sizes = sorted({spec.outer_diameter for _, spec in specs})
+        assumptions.append(
+            Assumption(
+                quantity="Line sizes",
+                value=", ".join(f"{size:g}" for size in sizes) + " mm OD",
+                source="user" if options.outer_diameter_mm else "drawing",
+                note=f"Read from {len(named)} of {len(lines)} line numbers (ASME B36.10 OD).",
+            )
+        )
+    level_source = (
+        "user" if options.pipe_elevation_mm else "drawing" if labelled_levels else (fallback_source)
+    )
     assumptions.append(
         Assumption(
             quantity="Pipe centreline elevation",
-            value=f"{pipe_z:g} mm",
-            source=elevation_source,  # type: ignore[arg-type]
-            note="Each run is checked at one elevation; risers shown only in elevations "
-            "are not reconstructed.",
+            value=f"{fallback:g} mm"
+            if not labelled_levels
+            else f"{labelled_levels} elevation label(s) read",
+            source=level_source,  # type: ignore[arg-type]
+            note="Runs change level at the corner between legs with different elevation "
+            "labels; a leg with no label takes its neighbour's level"
+            + ("" if labelled_levels else f", and a run with none sits at {fallback:g} mm")
+            + ".",
         )
     )
+    nozzles = sum(end.kind == "nozzle" for line in lines for end in line.ends)
+    if nozzles:
+        assumptions.append(
+            Assumption(
+                quantity="Nozzle projection",
+                value=f"{NOZZLE_PROJECTION_MM:g} mm",
+                source="default",
+                note=f"{nozzles} run ends meet equipment; a run ending inside an outline above "
+                "or below the equipment drops or rises to its top or bottom nozzle.",
+            )
+        )
+    valves = [
+        i
+        for i in plan_items
+        if "VALV" in i.entity.dxf.layer.upper()
+        or (i.entity.dxftype() == "INSERT" and "VALVE" in i.entity.dxf.name.upper())
+    ]
+    if not valves:
+        valves = [
+            entity
+            for entity in doc.modelspace().query("INSERT")
+            if "VALV" in entity.dxf.layer.upper() or "VALVE" in entity.dxf.name.upper()
+        ]
+    if valves:
+        assumptions.append(
+            Assumption(
+                quantity="Valves",
+                value=f"{len(valves)} drawn, modelled as straight pipe",
+                source="default",
+                note="Valve bodies, handwheels and their access are not checked yet.",
+            )
+        )
     if not lines:
         return InferredLayout(
             supported=False,
@@ -675,19 +868,52 @@ def infer_layout(
             views=views,
         )
 
+    tops = [
+        o.center[2] + (o.size[2] / 2 if isinstance(o, BoxObstacle) else o.height / 2)
+        for o in obstacles
+    ]
     if front is not None and options.equipment_height_mm is None:
         height = front[3] - front[1]
     else:
-        tops = [
-            o.center[2] + (o.size[2] / 2 if isinstance(o, BoxObstacle) else o.height / 2)
-            for o in obstacles
-        ]
-        height = max([*tops, pipe_z + od / 2 + clearance]) + max(
-            2 * (od / 2 + clearance), 0.1 * max([*tops, pipe_z])
+        highest = max(z + line.tube.outer_diameter / 2 + line.tube.minimum_clearance
+                      for line in lines for *_, z in line.points)  # fmt: skip
+        height = max([*tops, highest]) + max(2 * (od / 2 + clearance), 0.1 * max([*tops, highest]))
+
+    # ---- building columns and steel: full height unless an elevation shows them ----
+    structures: list[str] = []
+    for item in sorted(
+        (i for i in plan_items if i.role == "structure" and _closed_outline(i.entity)),
+        key=lambda i: (i.box, i.entity.dxf.handle),
+    ):
+        x0, y0 = local((item.box[0], item.box[1]))
+        x1, y1 = local((item.box[2], item.box[3]))
+        if x1 - x0 <= 0 or y1 - y0 <= 0:
+            continue
+        span = front_z_range(x0, x1, "structure")
+        z0, z1 = span if span and span[1] > span[0] else (0.0, height)
+        name = f"{item.entity.dxf.layer} at {(x0 + x1) / 2:.0f}, {(y0 + y1) / 2:.0f}"
+        obstacles.append(
+            BoxObstacle(
+                type="box",
+                name=name,
+                center=((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2),
+                size=(x1 - x0, y1 - y0, z1 - z0),
+            )
+        )
+        structures.append(name)
+    if structures:
+        assumptions.append(
+            Assumption(
+                quantity="Structure",
+                value=f"{len(structures)} column(s) or steel member(s)",
+                source="drawing",
+                note="Height from the elevation where drawn there, else floor to roof.",
+            )
         )
     return InferredLayout(
         supported=True,
-        message=f"Read {len(obstacles)} equipment item(s) and {len(lines)} pipe run(s).",
+        message=f"Read {len(equipment)} equipment item(s), {len(structures)} structural "
+        f"member(s) and {len(lines)} pipe run(s).",
         workspace=(round(extent[0], 6), round(extent[1], 6), round(height, 6)),
         obstacles=obstacles,
         equipment=equipment,
@@ -695,4 +921,183 @@ def infer_layout(
         tube=tube,
         assumptions=assumptions,
         views=views,
+        structures=structures,
     )
+
+
+def _segment_distance(point: Point2, a: Point2, b: Point2) -> float:
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    length = dx * dx + dy * dy
+    t = 0.0 if length == 0 else ((point[0] - a[0]) * dx + (point[1] - a[1]) * dy) / length
+    t = min(1.0, max(0.0, t))
+    return math.dist(point, (a[0] + t * dx, a[1] + t * dy))
+
+
+def _nearest_segment(plans: list[list[Point2]], point: Point2) -> tuple[float, int, int] | None:
+    """(distance, run, segment) of the plan segment closest to ``point``; ties go to the first."""
+    best = None
+    for run, corners in enumerate(plans):
+        for segment, (a, b) in enumerate(zip(corners, corners[1:], strict=False)):
+            candidate = (round(_segment_distance(point, a, b), 6), run, segment)
+            if best is None or candidate < best:
+                best = candidate
+    return best
+
+
+def _fill(heights: list[float | None], fallback: float) -> list[float]:
+    """Unlabelled legs take the level of the nearest labelled leg before them, else after."""
+    filled = list(heights)
+    last = None
+    for index, value in enumerate(filled):
+        if value is None:
+            filled[index] = last
+        else:
+            last = value
+    nxt = None
+    for index in range(len(filled) - 1, -1, -1):
+        if heights[index] is not None:
+            nxt = heights[index]
+        if filled[index] is None:
+            filled[index] = nxt
+    return [fallback if value is None else value for value in filled]
+
+
+def _rise(corners: list[Point2], heights: list[float]) -> list[Point3]:
+    """3D corner points: each leg at its own level, with a vertical riser where levels change."""
+    points: list[Point3] = [(corners[0][0], corners[0][1], heights[0])]
+    for index in range(1, len(corners) - 1):
+        x, y = corners[index]
+        points.append((x, y, heights[index - 1]))
+        if abs(heights[index] - heights[index - 1]) > 1e-6:
+            points.append((x, y, heights[index]))
+    points.append((corners[-1][0], corners[-1][1], heights[-1]))
+    return points
+
+
+def _along(path: list[Point3], point: Point3) -> list[Point3]:
+    """Prepend ``point`` to the path, merging it into the first leg when collinear."""
+    if math.dist(point, path[0]) <= 1e-6:
+        return path
+    if len(path) >= 2:
+        first = [path[1][i] - path[0][i] for i in range(3)]
+        new = [path[0][i] - point[i] for i in range(3)]
+        cross = (
+            first[1] * new[2] - first[2] * new[1],
+            first[2] * new[0] - first[0] * new[2],
+            first[0] * new[1] - first[1] * new[0],
+        )
+        if math.hypot(*cross) <= 1e-6 * max(1.0, math.hypot(*first) * math.hypot(*new)) and (
+            sum(first[i] * new[i] for i in range(3)) > 0
+        ):
+            return [point, *path[1:]]
+    return [point, *path]
+
+
+def _unit3(a: Point3, b: Point3) -> Point3:
+    length = math.dist(a, b)
+    return tuple(round((b[i] - a[i]) / length, 9) for i in range(3))  # type: ignore[return-value]
+
+
+def _span(obstacle: BoxObstacle | CylinderObstacle) -> tuple[float, float]:
+    half = obstacle.size[2] / 2 if isinstance(obstacle, BoxObstacle) else obstacle.height / 2
+    return (obstacle.center[2] - half, obstacle.center[2] + half)
+
+
+def _plan_depth(obstacle: BoxObstacle | CylinderObstacle, point: Point2) -> tuple[float, Point2]:
+    """Signed plan distance inside the outline (positive inside) and the outward normal there."""
+    cx, cy = obstacle.center[0], obstacle.center[1]
+    if isinstance(obstacle, CylinderObstacle):
+        offset = math.dist(point, (cx, cy))
+        normal = ((point[0] - cx) / offset, (point[1] - cy) / offset) if offset else (1.0, 0.0)
+        return obstacle.radius - offset, normal
+    half = (obstacle.size[0] / 2, obstacle.size[1] / 2)
+    depths = [
+        (half[0] - (point[0] - cx), (1.0, 0.0)),
+        (half[0] + (point[0] - cx), (-1.0, 0.0)),
+        (half[1] - (point[1] - cy), (0.0, 1.0)),
+        (half[1] + (point[1] - cy), (0.0, -1.0)),
+    ]
+    return min(depths)
+
+
+def _attach(
+    path: list[Point3],
+    index: int,
+    paths: list[list[Point3]],
+    obstacles: list[BoxObstacle | CylinderObstacle],
+    limits: Point2,
+    connectors: list[Rect],
+    spec: TubeSpecification,
+    tolerance: float,
+) -> tuple[list[Point3], LineEnd, str | None]:
+    """Work out what the start of ``path`` connects to and complete the path to it."""
+    x, y, z = path[0]
+    # a tee: the end lies on another run (the header), possibly at another level
+    for other, header in enumerate(paths):
+        if other == index:
+            continue
+        for a, b in zip(header, header[1:], strict=False):
+            if _segment_distance((x, y), a[:2], b[:2]) > tolerance:
+                continue
+            if abs(a[2] - b[2]) > 1e-6:  # a riser: join at the nearest level on it
+                level = min(max(z, min(a[2], b[2])), max(a[2], b[2]))
+            elif min(math.dist((x, y), a[:2]), math.dist((x, y), b[:2])) <= tolerance and (
+                header[0] in (a, b) or header[-1] in (a, b)
+            ):
+                continue  # end to end: not a tee
+            else:
+                level = a[2]
+            path = _along(path, (x, y, level))
+            return path, LineEnd("tee", path[0], _unit3(path[0], path[1])), None
+    # equipment: on the outline is a side nozzle; inside it, a top or bottom nozzle
+    for obstacle in sorted(obstacles, key=lambda o: o.name):
+        depth, normal = _plan_depth(obstacle, (x, y))
+        if depth < -tolerance:
+            continue
+        low, high = _span(obstacle)
+        if depth <= tolerance:
+            if not low <= z <= high:
+                note = (
+                    f"ends on the outline of {obstacle.name} at EL {z:.0f} mm, but "
+                    f"{obstacle.name} spans EL {low:.0f} to {high:.0f} mm"
+                )
+                return path, LineEnd("open", path[0], _unit3(path[0], path[1]), note=note), note
+            face = (x, y, z)
+            outward: Point3 = (normal[0], normal[1], 0.0)
+        elif z > high:
+            face, outward = (x, y, high), (0.0, 0.0, 1.0)
+        elif z < low:
+            face, outward = (x, y, low), (0.0, 0.0, -1.0)
+        else:
+            note = f"ends inside {obstacle.name} at EL {z:.0f} mm"
+            return path, LineEnd("open", path[0], _unit3(path[0], path[1]), note=note), note
+        path = _along(path, face)
+        leg = math.dist(path[0], path[1])
+        along = _unit3(path[0], path[1])
+        if sum(along[i] * outward[i] for i in range(3)) < 1 - 1e-6:
+            note = f"leaves {obstacle.name} at an angle to its surface, not along a nozzle"
+            end = LineEnd("nozzle", face, along, obstacle.name, face, note)
+            return path, end, note
+        if leg < NOZZLE_PROJECTION_MM - 1e-6:
+            note = (
+                f"its leg from {obstacle.name} is {leg:.0f} mm, shorter than the "
+                f"{NOZZLE_PROJECTION_MM:g} mm nozzle"
+            )
+            end = LineEnd("nozzle", face, along, obstacle.name, face, note)
+            return path, end, note
+        port = tuple(face[i] + outward[i] * NOZZLE_PROJECTION_MM for i in range(3))
+        path = [port, *path[1:]] if leg > NOZZLE_PROJECTION_MM + 1e-6 else path[1:]
+        if len(path) < 2:
+            note = f"is only the {NOZZLE_PROJECTION_MM:g} mm nozzle on {obstacle.name}"
+            return [face, port], LineEnd("nozzle", port, outward, obstacle.name, face), note
+        end = LineEnd("nozzle", path[0], outward, obstacle.name, face)  # type: ignore[arg-type]
+        return path, end, None
+    # a battery limit at the room or skid edge, or a drawn connection (drain hub, BL flange)
+    reach = BATTERY_LIMIT_REACH_MM
+    at_edge = min(x, y, limits[0] - x, limits[1] - y) <= reach
+    if at_edge or any(_inside((x, y), box, tolerance) for box in connectors):
+        what = "the room or skid limit" if at_edge else "a drawn connection"
+        end = LineEnd("battery_limit", path[0], _unit3(path[0], path[1]), note=f"at {what}")
+        return path, end, None
+    note = "ends in open space, connected to nothing on the drawing"
+    return path, LineEnd("open", path[0], _unit3(path[0], path[1]), note=note), None

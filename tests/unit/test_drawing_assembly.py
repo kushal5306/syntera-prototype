@@ -41,8 +41,10 @@ def test_layer_roles_follow_names_and_overrides():
     assert layer_role("NOZZLES", {}) == "nozzle"
     assert layer_role("M-EQPM", {}) == "equipment"  # US National CAD Standard
     assert layer_role("M-EQPM-NOZL", {}) == "nozzle"
-    assert layer_role("A-WALL", {}) is None
-    assert layer_role("A-WALL", {"A-WALL": "equipment"}) == "equipment"
+    assert layer_role("A-WALL", {}) == "frame"  # walls bound a plant room
+    assert layer_role("S-COLS", {}) == "structure"
+    assert layer_role("A-DOOR", {}) is None
+    assert layer_role("A-DOOR", {"A-DOOR": "equipment"}) == "equipment"
 
 
 def test_corner_points_recover_corners_from_sampled_bends():

@@ -223,7 +223,8 @@ function checkSection(s) {
     FIELDS.map(([key, label]) => el("label", {}, label, el("input", { name: key, type: "number", min: "0", step: "any", placeholder: "from drawing", value: state.options[key] ?? "" }))),
     el("label", {}, "Currency", el("input", { name: "currency", maxlength: "8", value: state.options.currency ?? "USD" })),
     COSTS.map(([key, label, value]) => el("label", {}, label, el("input", { name: key, type: "number", min: "0", step: "any", value: state.options[key] ?? value }))),
-    el("label", { class: "wide" }, "Layer roles (layer=equipment, pipe, pipe_centreline, nozzle, frame or ignore)",
+    el("label", { class: "wide check" }, el("input", { name: "optimise", type: "checkbox", ...((state.options.optimise ?? true) ? { checked: "" } : {}) }), " Also route each line to look for a shorter verified route (slower on big drawings)"),
+    el("label", { class: "wide" }, "Layer roles (layer=equipment, pipe, pipe_centreline, nozzle, structure, frame or ignore)",
       el("input", { name: "layer_roles", placeholder: "e.g. M-EQPT=equipment, P-PIPE=pipe", value: Object.entries(state.options.layer_roles || {}).map(([k, v]) => `${k}=${v}`).join(", ") })));
   const result = el("div", { id: "check-result" });
   if (state.check && state.check.report.drawing_id === s.drawing_id) result.append(...renderCheck(state.check.report));
@@ -241,6 +242,7 @@ function readOptions() {
   FIELDS.forEach(([key]) => { const v = form.elements[key].value.trim(); if (v !== "") options[key] = Number(v); });
   COSTS.forEach(([key]) => { const v = form.elements[key].value.trim(); if (v !== "") options[key] = Number(v); });
   const currency = form.elements.currency.value.trim(); if (currency) options.currency = currency;
+  options.optimise = form.elements.optimise.checked;
   const roles = {};
   form.elements.layer_roles.value.split(",").map((pair) => pair.split("=")).forEach(([layer, role]) => {
     if (layer && role && layer.trim() && role.trim()) roles[layer.trim()] = role.trim().toLowerCase();
@@ -272,7 +274,9 @@ async function runCheck(drawingId) {
 
 const metres = (mm) => (mm === null || mm === undefined ? "–" : `${fmt(mm / 1000, 2)} m`);
 const money = (report, value) => (value === null || value === undefined ? "–" : `${report.currency} ${fmt(value, 0)}`);
-const verdict = (route) => el("span", { class: `chip ${route.assurance_pass ? "pass" : "fail"}` }, route.assurance_pass ? "pass" : "fail");
+const notRun = (route) => (route.failure_reasons[0] || "").startsWith("not requested");
+const verdict = (route) => notRun(route) ? el("span", { class: "chip warn" }, "not run")
+  : el("span", { class: `chip ${route.assurance_pass ? "pass" : "fail"}` }, route.assurance_pass ? "pass" : "fail");
 
 function renderCheck(r) {
   if (!r.supported) return [el("div", { class: "reason soft" }, r.message)];
@@ -284,15 +288,19 @@ function renderCheck(r) {
       ["Estimated saving", money(r, r.total_cost_saving)],
     ]));
   }
+  out.push(...renderAudit(r, "Design audit of the drawn plant"));
+  if (r.audit) out.push(el("div", { class: "row wrap" }, el("a", { class: "btn", href: `/api/drawings/${r.drawing_id}/assembly/drawn_plant.step` }, "Plant STEP as drawn")));
   r.lines.forEach((line) => {
     const d = line.drawn, o = line.optimised;
-    out.push(section(line.name, `grid ${fmt(line.voxel_resolution_mm, 0)} mm`, table([["", ""], ["As drawn", "r"], ["Syntera", "r"]], [
+    const size = line.outer_diameter_mm ? `${fmt(line.outer_diameter_mm, 1)} mm OD · ` : "";
+    out.push(section(line.name, `${size}grid ${fmt(line.voxel_resolution_mm, 0)} mm`, table([["", ""], ["As drawn", "r"], ["Syntera", "r"]], [
       el("tr", {}, el("td", {}, "Checks"), el("td", { class: "r" }, verdict(d)), el("td", { class: "r" }, verdict(o))),
       el("tr", {}, el("td", {}, "Length"), el("td", { class: "r num" }, metres(d.length_mm)), el("td", { class: "r num" }, metres(o.length_mm))),
       el("tr", {}, el("td", {}, "Bends"), el("td", { class: "r num" }, d.bends), el("td", { class: "r num" }, o.buildable ? o.bends : "–")),
       el("tr", {}, el("td", {}, "Min clearance"), el("td", { class: "r num" }, d.minimum_clearance_mm === null ? "–" : `${fmt(d.minimum_clearance_mm, 0)} mm`), el("td", { class: "r num" }, o.minimum_clearance_mm === null ? "–" : `${fmt(o.minimum_clearance_mm, 0)} mm`)),
       el("tr", {}, el("td", {}, "Est. cost"), el("td", { class: "r num" }, money(r, d.estimated_cost)), el("td", { class: "r num" }, money(r, o.estimated_cost))),
     ])));
+    if (line.ends && line.ends.length) out.push(el("p", { class: "note" }, `Ends: ${line.ends.join("; ")}.`));
     const base = `/api/drawings/${r.drawing_id}/${line.folder}`;
     out.push(el("div", { class: "row wrap" },
       el("a", { class: "btn", href: `/?drawing=${r.drawing_id}&line=${line.folder.split("/").pop()}` }, "Open in route workbench"),

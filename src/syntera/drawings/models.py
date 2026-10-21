@@ -6,6 +6,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from syntera.verification.assembly_audit import AssemblyAudit
+
 
 class DrawingModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -79,7 +81,9 @@ class DrawingSummary(DrawingModel):
     space: str = "Model"
 
 
-LayerRole = Literal["equipment", "pipe", "pipe_centreline", "nozzle", "frame", "ignore"]
+LayerRole = Literal[
+    "equipment", "pipe", "pipe_centreline", "nozzle", "structure", "frame", "ignore"
+]
 
 
 class AssemblyOptions(DrawingModel):
@@ -97,6 +101,8 @@ class AssemblyOptions(DrawingModel):
     cost_per_bend: float = Field(default=45.0, ge=0)
     currency: str = Field(default="USD", min_length=1, max_length=8)
     layer_roles: dict[str, LayerRole] = Field(default_factory=dict)
+    # False checks the drawing as drawn only (fast); True also routes each line to compare.
+    optimise: bool = True
 
 
 class Assumption(DrawingModel):
@@ -136,6 +142,10 @@ class RouteCheck(DrawingModel):
 class LineCheck(DrawingModel):
     name: str
     folder: str
+    line_number: str | None = None
+    outer_diameter_mm: float | None = None
+    # what each end connects to, e.g. "nozzle on T-201", "tee", "battery limit"
+    ends: list[str] = Field(default_factory=list)
     nozzle_shift_mm: float
     voxel_resolution_mm: float
     drawn: RouteCheck
@@ -165,3 +175,5 @@ class PipingCheckReport(DrawingModel):
     total_optimised_length_mm: float | None
     total_cost_saving: float | None
     findings: list[str]
+    # every drawn pipe, nozzle, item of equipment and structure checked against each other
+    audit: AssemblyAudit | None = None
