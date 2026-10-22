@@ -6,6 +6,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from syntera.verification.assembly_audit import AssemblyAudit
+
 Point3 = tuple[float, float, float]
 Source = Literal["pid", "default"]
 
@@ -85,6 +87,20 @@ class PlacedRoute(PidModel):
     minimum_clearance_mm: float | None
     failure_reasons: list[str]
     folder: str
+    tees: list[str] = Field(default_factory=list)  # shared nozzles this line joins by a tee
+
+
+class RoutingTrial(PidModel):
+    """One deterministic routing order tried by the rip-up-and-reroute optimiser."""
+
+    strategy: str
+    routed: int
+    failed: int
+    audit_pass: bool
+    audit_findings: int
+    total_pipe_length_mm: float
+    total_bends: int
+    chosen: bool
 
 
 class PlantLayoutReport(PidModel):
@@ -106,3 +122,5 @@ class PlantLayoutReport(PidModel):
     layout_score_mm: float
     assumptions: list[str]
     skipped: list[str]
+    audit: AssemblyAudit | None = None
+    optimisation: list[RoutingTrial] = Field(default_factory=list)

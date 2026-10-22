@@ -46,7 +46,7 @@ def plant_meshes(result: PlantResult) -> list[dict]:
         if geometry.tube is None:
             continue
         properties = geometry.route.model_dump(mode="json")
-        for j, shape in enumerate([geometry.tube, *geometry.stubs]):
+        for j, shape in enumerate([geometry.tube, *(stub.shape for stub in geometry.stubs)]):
             meshes.append(
                 shape_mesh(f"route-{i + 1}-{j}", f"line {geometry.route.line}", "route",
                            shape, PIPE_COLOUR, properties, tolerance)

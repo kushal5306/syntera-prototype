@@ -223,7 +223,8 @@ function checkSection(s) {
     FIELDS.map(([key, label]) => el("label", {}, label, el("input", { name: key, type: "number", min: "0", step: "any", placeholder: "from drawing", value: state.options[key] ?? "" }))),
     el("label", {}, "Currency", el("input", { name: "currency", maxlength: "8", value: state.options.currency ?? "USD" })),
     COSTS.map(([key, label, value]) => el("label", {}, label, el("input", { name: key, type: "number", min: "0", step: "any", value: state.options[key] ?? value }))),
-    el("label", { class: "wide" }, "Layer roles (layer=equipment, pipe, pipe_centreline, nozzle, frame or ignore)",
+    el("label", { class: "wide check" }, el("input", { name: "optimise", type: "checkbox", ...((state.options.optimise ?? true) ? { checked: "" } : {}) }), " Also route each line to look for a shorter verified route (slower on big drawings)"),
+    el("label", { class: "wide" }, "Layer roles (layer=equipment, pipe, pipe_centreline, nozzle, structure, frame or ignore)",
       el("input", { name: "layer_roles", placeholder: "e.g. M-EQPT=equipment, P-PIPE=pipe", value: Object.entries(state.options.layer_roles || {}).map(([k, v]) => `${k}=${v}`).join(", ") })));
   const result = el("div", { id: "check-result" });
   if (state.check && state.check.report.drawing_id === s.drawing_id) result.append(...renderCheck(state.check.report));
@@ -241,6 +242,7 @@ function readOptions() {
   FIELDS.forEach(([key]) => { const v = form.elements[key].value.trim(); if (v !== "") options[key] = Number(v); });
   COSTS.forEach(([key]) => { const v = form.elements[key].value.trim(); if (v !== "") options[key] = Number(v); });
   const currency = form.elements.currency.value.trim(); if (currency) options.currency = currency;
+  options.optimise = form.elements.optimise.checked;
   const roles = {};
   form.elements.layer_roles.value.split(",").map((pair) => pair.split("=")).forEach(([layer, role]) => {
     if (layer && role && layer.trim() && role.trim()) roles[layer.trim()] = role.trim().toLowerCase();
@@ -272,7 +274,9 @@ async function runCheck(drawingId) {
 
 const metres = (mm) => (mm === null || mm === undefined ? "–" : `${fmt(mm / 1000, 2)} m`);
 const money = (report, value) => (value === null || value === undefined ? "–" : `${report.currency} ${fmt(value, 0)}`);
-const verdict = (route) => el("span", { class: `chip ${route.assurance_pass ? "pass" : "fail"}` }, route.assurance_pass ? "pass" : "fail");
+const notRun = (route) => (route.failure_reasons[0] || "").startsWith("not requested");
+const verdict = (route) => notRun(route) ? el("span", { class: "chip warn" }, "not run")
+  : el("span", { class: `chip ${route.assurance_pass ? "pass" : "fail"}` }, route.assurance_pass ? "pass" : "fail");
 
 function renderCheck(r) {
   if (!r.supported) return [el("div", { class: "reason soft" }, r.message)];
@@ -284,15 +288,19 @@ function renderCheck(r) {
       ["Estimated saving", money(r, r.total_cost_saving)],
     ]));
   }
+  out.push(...renderAudit(r, "Design audit of the drawn plant"));
+  if (r.audit) out.push(el("div", { class: "row wrap" }, el("a", { class: "btn", href: `/api/drawings/${r.drawing_id}/assembly/drawn_plant.step` }, "Plant STEP as drawn")));
   r.lines.forEach((line) => {
     const d = line.drawn, o = line.optimised;
-    out.push(section(line.name, `grid ${fmt(line.voxel_resolution_mm, 0)} mm`, table([["", ""], ["As drawn", "r"], ["Syntera", "r"]], [
+    const size = line.outer_diameter_mm ? `${fmt(line.outer_diameter_mm, 1)} mm OD · ` : "";
+    out.push(section(line.name, `${size}grid ${fmt(line.voxel_resolution_mm, 0)} mm`, table([["", ""], ["As drawn", "r"], ["Syntera", "r"]], [
       el("tr", {}, el("td", {}, "Checks"), el("td", { class: "r" }, verdict(d)), el("td", { class: "r" }, verdict(o))),
       el("tr", {}, el("td", {}, "Length"), el("td", { class: "r num" }, metres(d.length_mm)), el("td", { class: "r num" }, metres(o.length_mm))),
       el("tr", {}, el("td", {}, "Bends"), el("td", { class: "r num" }, d.bends), el("td", { class: "r num" }, o.buildable ? o.bends : "–")),
       el("tr", {}, el("td", {}, "Min clearance"), el("td", { class: "r num" }, d.minimum_clearance_mm === null ? "–" : `${fmt(d.minimum_clearance_mm, 0)} mm`), el("td", { class: "r num" }, o.minimum_clearance_mm === null ? "–" : `${fmt(o.minimum_clearance_mm, 0)} mm`)),
       el("tr", {}, el("td", {}, "Est. cost"), el("td", { class: "r num" }, money(r, d.estimated_cost)), el("td", { class: "r num" }, money(r, o.estimated_cost))),
     ])));
+    if (line.ends && line.ends.length) out.push(el("p", { class: "note" }, `Ends: ${line.ends.join("; ")}.`));
     const base = `/api/drawings/${r.drawing_id}/${line.folder}`;
     out.push(el("div", { class: "row wrap" },
       el("a", { class: "btn", href: `/?drawing=${r.drawing_id}&line=${line.folder.split("/").pop()}` }, "Open in route workbench"),
@@ -363,7 +371,7 @@ const model = (() => {
       world.add(new THREE.Mesh(geom, mat));
       bounds.expandByPoint(new THREE.Vector3(...m.bounds.min)); bounds.expandByPoint(new THREE.Vector3(...m.bounds.max));
     });
-    const ws = payload.report.workspace_mm;
+    const ws = payload.report && payload.report.workspace_mm;
     if (ws) {
       const frame = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(...ws)), new THREE.LineBasicMaterial({ color: 0x8b9aa3 }));
       frame.position.set(ws[0] / 2, ws[1] / 2, ws[2] / 2); world.add(frame);
@@ -447,12 +455,82 @@ function renderPlant(payload) {
         el("td", { class: "r num" }, route.length_mm === null ? "–" : `${fmt(route.length_mm / 1000, 2)} m`),
         el("td", {}, el("span", { class: `chip ${route.assurance_pass ? "pass" : "fail"}` }, route.assurance_pass ? "pass" : "not routed")))))),
     r.failed ? el("div", { class: "reason soft" }, `${r.failed} line(s) could not be routed in this layout: ${r.routes.filter((x) => !x.routed).map((x) => `${x.line} (${x.failure_reasons[0] || "no route"})`).join("; ")}.`) : null,
+    ...renderAudit(r),
     section("Equipment", `${r.equipment.length}`, table([["Tag"], ["Class"], ["Size, mm"], ["Source"]],
       r.equipment.map((e) => el("tr", { title: e.size_note }, el("td", {}, e.tag), el("td", { class: "cell-text" }, e.component_class),
         el("td", { class: "num" }, e.size.map((v) => fmt(v, 0)).join(" × ")),
         el("td", {}, el("span", { class: `chip ${e.size_source === "pid" ? "pass" : "warn"}` }, e.size_source === "pid" ? "P&ID" : "default")))))),
     section("What was assumed", null, el("ul", { class: "findings" }, [...r.assumptions, ...r.skipped].map((text) => el("li", {}, text)))),
   ].filter(Boolean);
+}
+
+// ---- any STEP assembly: whole-assembly design audit ----
+async function uploadAudit(file) {
+  busy("Reading every solid and checking each pair. Large assemblies take a minute or two…");
+  try {
+    const payload = await api(`/api/audit?filename=${encodeURIComponent(file.name)}`, {
+      method: "POST", headers: { "Content-Type": "application/step" }, body: file,
+    });
+    state.summary = null;
+    state.check = null;
+    document.querySelectorAll("#drawing-list li").forEach((li) => li.setAttribute("aria-selected", "false"));
+    $("drop").hidden = true;
+    $("details").replaceChildren(
+      section("Design audit of a STEP assembly", null, el("p", { class: "note" },
+        "Solids that are a single swept tube up to DN600 are treated as pipe; everything else as equipment. Red solids are named in a failing finding.")),
+      kv([
+        ["File", payload.filename],
+        ["Pipe solids", fmt(payload.pipes, 0)],
+        ["Other solids", fmt(payload.equipment, 0)],
+        ["Pipe ODs, mm", payload.sizes_mm.map((v) => fmt(v, 1)).join(", ") || "–"],
+      ]),
+      el("div", { class: "row wrap" }, el("a", { class: "btn", href: `/api/audit/${payload.audit_id}/audit.json` }, "Audit JSON")),
+      ...renderAudit({ audit: payload.audit }, "Result"));
+    $("mode-3d").disabled = false;
+    $("mode-2d").disabled = true;
+    $("legend-drawn").hidden = true;
+    model.load(payload);
+    setMode("3d");
+    $("units-foot").textContent = "millimetres · Z up · drag to orbit";
+  } catch (error) {
+    $("details").replaceChildren(el("div", { class: "reason" }, `Could not audit ${file.name}: ${error.message}`));
+  } finally {
+    $("busy").hidden = true;
+  }
+}
+
+// The whole-assembly design audit and, for a plant, the routing orders the optimiser tried.
+function renderAudit(r, title = "Design audit") {
+  const a = r.audit;
+  if (!a) return [];
+  const chip = { pass: "pass", fail: "fail", advisory: "warn" };
+  const findings = a.rules.flatMap((rule) => rule.findings.map((f) => ({ rule, f })));
+  const parts = [
+    section(title, `${a.parts} solids`, el("p", { class: "note" },
+      "Every solid checked against every other one, with sizes measured from the CAD solids themselves. ",
+      el("strong", {}, a.summary), ".")),
+    table([["Rule"], ["Checked", "r"], ["Result"]], a.rules.map((rule) => el("tr", { title: rule.basis },
+      el("td", {}, rule.title),
+      el("td", { class: "r num" }, fmt(rule.checked, 0)),
+      el("td", {}, el("span", { class: `chip ${chip[rule.status]}` },
+        rule.status === "pass" ? "pass" : `${rule.findings.length} ${rule.status === "fail" ? "fail" : "to review"}`))))),
+  ];
+  if (findings.length) {
+    parts.push(el("ul", { class: "findings" }, findings.map(({ rule, f }) =>
+      el("li", { class: rule.status === "fail" ? "fail" : "" }, `${rule.status === "fail" ? "Fail" : "Review"}: ${f.message}`))));
+  }
+  if (r.optimisation && r.optimisation.length > 1) {
+    parts.push(section("Optimisation", "rip-up and reroute", el("p", { class: "note" },
+      "The plant was routed again in other line orders. The kept pass has the fewest unrouted lines, then the fewest audit failures, then the least pipe."),
+      table([["Order"], ["Routed", "r"], ["Audit", "r"], ["Pipe", "r"], ["Bends", "r"]], r.optimisation.map((t) =>
+        el("tr", { class: t.chosen ? "chosen" : "" },
+          el("td", {}, t.strategy.replaceAll("-", " "), t.chosen ? el("span", { class: "chip pass" }, "kept") : null),
+          el("td", { class: "r num" }, `${t.routed}/${t.routed + t.failed}`),
+          el("td", { class: "r num" }, t.audit_pass ? "pass" : `${t.audit_findings} fail`),
+          el("td", { class: "r num" }, `${fmt(t.total_pipe_length_mm / 1000, 1)} m`),
+          el("td", { class: "r num" }, fmt(t.total_bends, 0)))))));
+  }
+  return parts;
 }
 
 // ---- loading ----
@@ -507,6 +585,11 @@ async function upload(file) {
 
 async function init() {
   bindSheet();
+  $("audit-input").addEventListener("change", (event) => {
+    const file = event.target.files[0];
+    if (file) uploadAudit(file);
+    event.target.value = "";
+  });
   $("pid-input").addEventListener("change", (event) => {
     const file = event.target.files[0];
     if (file) uploadPid(file);

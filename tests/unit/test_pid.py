@@ -69,8 +69,12 @@ def test_plant_routes_and_verifies_every_line(dexpi_xml, tmp_path):
     for i, a in enumerate(tubes):
         for b in tubes[i + 1 :]:
             assert a.intersect(b).Volume() <= 1e-6
+    # the finished plant passes the whole-assembly audit
+    assert report.audit is not None and report.audit.overall_pass, report.audit.summary
+    assert {rule.id for rule in report.audit.rules} >= {"clash", "clearance", "connections"}
     saved = json.loads((tmp_path / "plant" / REPORT_FILE).read_text())
     assert saved["routed"] == 3
+    assert saved["audit"]["overall_pass"] is True
     assert (tmp_path / "plant" / PLANT_STEP).is_file()
     assert (tmp_path / "plant" / "route-1" / "config.json").is_file()
 
@@ -88,3 +92,18 @@ def test_plant_routes_and_verifies_every_line(dexpi_xml, tmp_path):
         assert "user" not in {entry.source for entry in why.entries}
         assert why.get("tube.outer_diameter").value == route.outer_diameter_mm
         assert why.get("voxel_resolution").source == "calculation"
+
+
+def test_nozzles_sit_on_the_equipment_surface_within_its_height(dexpi_xml):
+    from syntera.pid.build import _equipment_obstacles
+    from syntera.spatial.occupancy import point_to_obstacle_distance
+
+    document = read_dexpi(dexpi_xml.read_bytes(), dexpi_xml.name)
+    layout = place(document, 200.0)
+    obstacles = {o.name: o for o in _equipment_obstacles(layout)}
+    owner = {n.id: e.tag for e in document.equipment for n in e.nozzles}
+    for terminal_id, port in layout.ports.items():
+        if terminal_id not in owner:
+            continue  # battery limit at the skid edge
+        # on the surface (curved tank walls included), not on a bounding box
+        assert point_to_obstacle_distance(port.face, obstacles[owner[terminal_id]]) < 1e-6

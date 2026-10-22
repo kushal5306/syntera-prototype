@@ -41,6 +41,8 @@
 .check-form label { display: grid; gap: 3px; font-size: 12px; color: var(--muted); }
 .check-form input { border: 1px solid var(--line); background: var(--raised); border-radius: 5px; padding: 5px 7px; font: 12px var(--font-mono); min-width: 0; }
 .check-form .wide { grid-column: 1 / -1; }
+.check-form label.check { display: flex; align-items: center; gap: 6px; }
+.check-form label.check input { flex: none; }
 .findings { margin: 6px 0 0; padding-left: 18px; font-size: 13px; }
 .findings li { margin-bottom: 4px; }
 .reason.good { background: var(--pass-soft); color: var(--pass); }

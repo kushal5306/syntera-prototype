@@ -104,8 +104,42 @@ def run_pid_3d(source: Path, output: Path) -> int:
     for route in report.routes:
         if not route.routed:
             print(f"- not routed: line {route.line} ({'; '.join(route.failure_reasons)})")
+    for trial in report.optimisation:
+        kept = " (kept)" if trial.chosen else ""
+        print(
+            f"Routing order {trial.strategy}: {trial.routed} routed, "
+            f"{trial.audit_findings} audit failure(s), "
+            f"{trial.total_pipe_length_mm / 1000:.1f} m{kept}"
+        )
+    audit = report.audit
+    if audit is not None:
+        print(f"Design audit: {'PASS' if audit.overall_pass else 'FAIL'}: {audit.summary}")
+        for rule in audit.rules:
+            for finding in rule.findings:
+                label = "fail" if rule.status == "fail" else "review"
+                print(f"- {label} [{rule.id}]: {finding.message}")
     print(f"Report: {folder / REPORT_FILE}")
-    return 0 if report.failed == 0 else 2
+    return 0 if report.failed == 0 and (audit is None or audit.overall_pass) else 2
+
+
+def run_audit_step(source: Path, output: Path, max_pipe_od: float) -> int:
+    """Audit every solid of a STEP assembly against every other one."""
+    from syntera.verification.step_audit import audit_step
+
+    result = audit_step(source, max_pipe_od=max_pipe_od)
+    audit = result.audit
+    sizes = ", ".join(f"{size:g}" for size in result.sizes_mm) or "none"
+    print(f"STEP: {source.name}: {result.pipes} pipe solid(s) (OD {sizes} mm), "
+          f"{result.equipment} other solid(s)")  # fmt: skip
+    print(f"Design audit: {'PASS' if audit.overall_pass else 'FAIL'}: {audit.summary}")
+    for rule in audit.rules:
+        for finding in rule.findings:
+            label = "fail" if rule.status == "fail" else "review"
+            print(f"- {label} [{rule.id}]: {finding.message}")
+    output.mkdir(parents=True, exist_ok=True)
+    write_json(audit, output / "assembly_audit.json")
+    print(f"Report: {output / 'assembly_audit.json'}")
+    return 0 if audit.overall_pass else 2
 
 
 def run_compare(baseline_path: Path, output: Path) -> int:
@@ -225,6 +259,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     pid.add_argument("--input", type=Path, required=True)
     pid.add_argument("--output", type=Path, default=Path("outputs/pid"))
+    audit = subparsers.add_parser(
+        "audit-step",
+        help="audit a STEP assembly for clashes, clearances, bend radii and unjoined ends",
+    )
+    audit.add_argument("--input", type=Path, required=True)
+    audit.add_argument("--output", type=Path, default=Path("outputs/audit"))
+    audit.add_argument(
+        "--max-pipe-od", type=float, default=610.0,
+        help="largest outside diameter, mm, treated as pipe; bigger round solids are vessels",
+    )  # fmt: skip
     comparison = subparsers.add_parser(
         "compare", help="compare a routed run with a baseline skid (KPI 2 package size)"
     )
@@ -276,6 +320,8 @@ def main(argv: list[str] | None = None) -> int:
             return run_kpi1(args.log, args.baseline, args.output)
         if args.command == "drawing":
             return run_drawing(args.input, args.output)
+        if args.command == "audit-step":
+            return run_audit_step(args.input, args.output, args.max_pipe_od)
         if args.command == "pid-3d":
             return run_pid_3d(args.input, args.output)
         if args.command == "drawing-check":
