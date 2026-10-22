@@ -160,50 +160,56 @@ function table(headers, rows) {
     el("tbody", {}, rows)));
 }
 
+function fold(title, aside, ...body) {
+  return el("details", { class: "fold" }, el("summary", {}, el("span", {}, title), aside ? el("span", { class: "note" }, aside) : null), ...body);
+}
+
 function renderDetails(s) {
   const units = s.units.mm_per_unit === 1 ? el("span", { class: "chip pass" }, "mm")
     : el("span", { class: "chip warn" }, s.units.name);
   const box = s.view_extents;
   const extentText = box ? `${fmt(box[1][0] - box[0][0])} × ${fmt(box[1][1] - box[0][1])}` : "empty";
   const parts = [
-    checkSection(s),
-    section("Source", null, kv([
-      ["File", s.filename],
-      ["Format", s.source_format.toUpperCase()],
-      ["DWG release", s.dwg_version || "–"],
-      ["Converter", s.conversion ? `${s.conversion.converter}${s.conversion.converter_version ? ` (${s.conversion.converter_version})` : ""}` : "none (DXF read directly)"],
-      ["Units", units],
-      ["Shown", !s.space || s.space === "Model" ? "Model space" : `Paper space: ${s.space} (model space draws nothing)`],
-      ["Drawing size", extentText],
-      ["Entities", fmt(s.entity_count, 0)],
-      ["SHA-256", s.source_sha256.slice(0, 16) + "…"],
-    ]), el("div", { class: "row" },
-      el("a", { class: "btn", href: `/api/drawings/${s.drawing_id}/drawing.dxf`, download: `${s.filename.replace(/\.[^.]+$/, "")}.dxf` }, "Download DXF"),
-      el("a", { class: "btn", href: `/api/drawings/${s.drawing_id}/summary.json`, download: "summary.json" }, "Summary JSON"))),
+    el("div", { class: "file-line" }, el("strong", { title: s.filename }, s.filename), units),
   ];
   const cautions = [];
   if (s.units.mm_per_unit === null) cautions.push("The drawing does not declare units ($INSUNITS). Confirm the scale before using any dimension.");
   if (s.clipped_handles.length) cautions.push(`${s.clipped_handles.length} entity(ies) far outside the drawing were left out of the default view: ${s.clipped_handles.join(", ")}.`);
   if (s.audit_errors) cautions.push(`The DXF needed ${s.audit_errors} repair(s) while reading; compare against the original before relying on it.`);
-  if (s.truncated) cautions.push("Only the first 500 dimensions and 500 text notes are listed.");
   cautions.forEach((text) => parts.push(el("div", { class: "reason soft" }, text)));
+  parts.push(checkSection(s));
+  const read = [
+    kv([
+      ["Format", s.source_format.toUpperCase()],
+      ["DWG release", s.dwg_version || "–"],
+      ["Converter", s.conversion ? `${s.conversion.converter}${s.conversion.converter_version ? ` (${s.conversion.converter_version})` : ""}` : "none (DXF read directly)"],
+      ["Shown", !s.space || s.space === "Model" ? "Model space" : `Paper space: ${s.space} (model space draws nothing)`],
+      ["Drawing size", extentText],
+      ["Entities", fmt(s.entity_count, 0)],
+      ["SHA-256", s.source_sha256.slice(0, 16) + "…"],
+    ]),
+    el("div", { class: "row wrap" },
+      el("a", { class: "btn", href: `/api/drawings/${s.drawing_id}/drawing.dxf`, download: `${s.filename.replace(/\.[^.]+$/, "")}.dxf` }, "Download DXF"),
+      el("a", { class: "btn", href: `/api/drawings/${s.drawing_id}/summary.json`, download: "summary.json" }, "Summary JSON")),
+  ];
+  if (s.truncated) read.push(el("p", { class: "note" }, "Only the first 500 dimensions and 500 text notes are listed."));
   if (s.conversion && s.conversion.warnings.length) {
-    parts.push(section("Converter messages", `${s.conversion.warnings.length}`,
+    read.push(section("Converter messages", `${s.conversion.warnings.length}`,
       el("p", { class: "note" }, "Objects the converter could not fully decode may be missing from the view."),
       el("ul", { class: "warnings" }, s.conversion.warnings.map((line) => el("li", {}, line)))));
   }
-  parts.push(section("Layers", `${s.layers.length}`, table([["Layer"], ["Colour", "r"], ["Entities", "r"], ["State"]],
-    s.layers.map((layer) => el("tr", {}, el("td", {}, layer.name), el("td", { class: "r" }, layer.color), el("td", { class: "r" }, fmt(layer.entity_count, 0)),
+  read.push(section("Layers", `${s.layers.length}`, table([["Layer"], ["Entities", "r"], ["State"]],
+    s.layers.map((layer) => el("tr", {}, el("td", {}, layer.name), el("td", { class: "r" }, fmt(layer.entity_count, 0)),
       el("td", {}, layer.frozen ? "frozen" : layer.visible ? "on" : "off"))))));
-  parts.push(section("Dimensions", `${s.dimensions.length}`, s.dimensions.length ? table([["Type"], ["Value", "r"], ["Text"], ["Layer"]],
+  read.push(section("Dimensions", `${s.dimensions.length}`, s.dimensions.length ? table([["Type"], ["Value", "r"], ["Text"]],
     s.dimensions.map((dim) => el("tr", {}, el("td", {}, dim.kind), el("td", { class: "r" }, fmt(dim.measurement, 3)),
-      el("td", { class: "cell-text" }, dim.text && dim.text !== "<>" ? dim.text : "–"), el("td", { class: "cell-text" }, dim.layer))))
+      el("td", { class: "cell-text" }, dim.text && dim.text !== "<>" ? dim.text : "–"))))
     : el("p", { class: "note" }, "No dimension entities in model space.")));
-  parts.push(section("Text notes", `${s.texts.length}`, s.texts.length ? table([["Text"], ["Layer"]],
-    s.texts.map((note) => el("tr", { class: "clickable", title: "Show on drawing", onclick: () => focusOn(...note.position) },
+  read.push(section("Text notes", `${s.texts.length}`, s.texts.length ? table([["Text"], ["Layer"]],
+    s.texts.map((note) => el("tr", { class: "clickable", title: "Show on drawing", onclick: () => { setMode("2d"); focusOn(...note.position); } },
       el("td", { class: "cell-text" }, note.text), el("td", { class: "cell-text" }, note.layer))))
     : el("p", { class: "note" }, "No text in model space.")));
-  parts.push(section("Entity types", null, kv(Object.entries(s.entity_types).map(([type, count]) => [type, fmt(count, 0)]))));
+  parts.push(fold("What Syntera read from the drawing", `${s.layers.length} layers · ${s.texts.length} notes`, ...read));
   $("details").replaceChildren(...parts);
   $("units-foot").textContent = `${s.units.name} · Y up`;
 }
@@ -220,19 +226,21 @@ const COSTS = [["cost_per_metre", "Cost per metre", 120], ["cost_per_bend", "Cos
 
 function checkSection(s) {
   const form = el("form", { class: "check-form", id: "check-form", onsubmit: (event) => { event.preventDefault(); runCheck(s.drawing_id); } },
+    el("p", { class: "note wide" }, "Leave a field empty to read it from the drawing or use the stated default."),
     FIELDS.map(([key, label]) => el("label", {}, label, el("input", { name: key, type: "number", min: "0", step: "any", placeholder: "from drawing", value: state.options[key] ?? "" }))),
     el("label", {}, "Currency", el("input", { name: "currency", maxlength: "8", value: state.options.currency ?? "USD" })),
     COSTS.map(([key, label, value]) => el("label", {}, label, el("input", { name: key, type: "number", min: "0", step: "any", value: state.options[key] ?? value }))),
-    el("label", { class: "wide check" }, el("input", { name: "optimise", type: "checkbox", ...((state.options.optimise ?? true) ? { checked: "" } : {}) }), " Also route each line to look for a shorter verified route (slower on big drawings)"),
     el("label", { class: "wide" }, "Layer roles (layer=equipment, pipe, pipe_centreline, nozzle, structure, frame or ignore)",
       el("input", { name: "layer_roles", placeholder: "e.g. M-EQPT=equipment, P-PIPE=pipe", value: Object.entries(state.options.layer_roles || {}).map(([k, v]) => `${k}=${v}`).join(", ") })));
   const result = el("div", { id: "check-result" });
-  if (state.check && state.check.report.drawing_id === s.drawing_id) result.append(...renderCheck(state.check.report));
+  const done = state.check && state.check.report.drawing_id === s.drawing_id;
+  if (done) result.append(...renderCheck(state.check.report));
   return el("section", { class: "check-section" },
-    el("div", { class: "section-title" }, el("h3", {}, "3D assembly and piping check")),
-    el("p", { class: "note" }, "Builds equipment and pipes in 3D from a plan layout, then checks each pipe run as drawn against the shortest route Syntera can verify. Leave a field empty to read it from the drawing or use the stated default."),
-    el("details", {}, el("summary", {}, "Inputs and cost rates"), form),
-    el("div", { class: "row" }, el("button", { class: "btn primary", id: "check-run", onclick: () => runCheck(s.drawing_id) }, "Generate 3D and check piping")),
+    el("div", { class: "run-row" },
+      el("button", { class: "btn primary", id: "check-run", onclick: () => runCheck(s.drawing_id) }, done ? "Run the check again" : "Check design and piping"),
+      el("label", { class: "check", title: "Routes every line again to look for a shorter verified route. About 5 minutes on a 14-line plant room." },
+        el("input", { id: "opt-optimise", type: "checkbox", ...((state.options.optimise ?? true) ? { checked: "" } : {}) }), " Look for shorter routes")),
+    el("details", { class: "settings" }, el("summary", {}, "Settings: sizes, clearance, cost rates, layer roles"), form),
     result);
 }
 
@@ -242,7 +250,7 @@ function readOptions() {
   FIELDS.forEach(([key]) => { const v = form.elements[key].value.trim(); if (v !== "") options[key] = Number(v); });
   COSTS.forEach(([key]) => { const v = form.elements[key].value.trim(); if (v !== "") options[key] = Number(v); });
   const currency = form.elements.currency.value.trim(); if (currency) options.currency = currency;
-  options.optimise = form.elements.optimise.checked;
+  options.optimise = $("opt-optimise").checked;
   const roles = {};
   form.elements.layer_roles.value.split(",").map((pair) => pair.split("=")).forEach(([layer, role]) => {
     if (layer && role && layer.trim() && role.trim()) roles[layer.trim()] = role.trim().toLowerCase();
@@ -254,7 +262,8 @@ function readOptions() {
 async function runCheck(drawingId) {
   const button = $("check-run");
   state.options = readOptions();
-  button.disabled = true; button.textContent = "Building the 3D assembly and routing…";
+  button.disabled = true;
+  button.textContent = state.options.optimise ? "Checking and routing (a few minutes)…" : "Checking the drawn design…";
   try {
     const payload = await api(`/api/drawings/${drawingId}/assembly`, {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(state.options),
@@ -268,7 +277,7 @@ async function runCheck(drawingId) {
   } catch (error) {
     $("check-result").replaceChildren(el("div", { class: "reason" }, `Check failed: ${error.message}`));
   } finally {
-    button.disabled = false; button.textContent = "Generate 3D and check piping";
+    button.disabled = false; button.textContent = "Run the check again";
   }
 }
 
@@ -277,43 +286,203 @@ const money = (report, value) => (value === null || value === undefined ? "–" 
 const notRun = (route) => (route.failure_reasons[0] || "").startsWith("not requested");
 const verdict = (route) => notRun(route) ? el("span", { class: "chip warn" }, "not run")
   : el("span", { class: `chip ${route.assurance_pass ? "pass" : "fail"}` }, route.assurance_pass ? "pass" : "fail");
+const lineKey = (name) => String(name).toUpperCase();
+
+// One entry per real error: the backend's deduplicated `issues` when present, otherwise built from the audit.
+function collectIssues(r) {
+  if (Array.isArray(r.issues)) return r.issues.map((i) => ({ ...i, inDrawing: true }));
+  const issues = [], seen = new Map();
+  const lineNames = new Set(r.lines.map((l) => lineKey(l.name)));
+  const isPipe = (part) => lineNames.has(lineKey(part));
+  const rules = r.audit ? r.audit.rules.filter((rule) => rule.status === "fail") : [];
+  rules.forEach((rule) => rule.findings.forEach((f) => {
+    if (rule.id === "completeness") {
+      const line = r.lines.find((l) => f.parts.includes(l.name));
+      const reason = line ? (line.drawn.failure_reasons[0] || "") : "";
+      issues.push({ rule: "buildable", title: `${f.parts[0]} cannot be built as drawn`, lines: f.parts, parts: [],
+        what: reason ? `${reason.charAt(0).toUpperCase()}${reason.slice(1)}.` : f.message, where: null,
+        evidence: { text: reason || f.message }, fix: "Change the run's level or leg lengths so every elbow gets its full bend radius." });
+      return;
+    }
+    const key = [...f.parts].sort().join(" | ");
+    const pipes = f.parts.filter(isPipe), others = f.parts.filter((p) => !isPipe(p));
+    const existing = seen.get(key);
+    if (existing) { // a clash and its 0 mm clearance finding are one error
+      if (rule.id === "clearance" && f.required_mm !== null) existing.evidence.required_mm = f.required_mm;
+      return;
+    }
+    const clash = rule.id === "clash";
+    const named = [...pipes, ...others];
+    const issue = {
+      rule: rule.id, lines: pipes, parts: others, title: clash ? `${named.join(" clashes with ")}` : `${named.join(" too close to ")}`,
+      what: f.message, where: f.location ? { x: f.location[0], y: f.location[1], el: f.location[2] } : null,
+      evidence: { measured_mm: clash ? 0 : f.measured_mm, required_mm: f.required_mm, text: f.message },
+      fix: pipes.length > 1 ? `Run ${pipes[pipes.length - 1]} at a different elevation, or offset it sideways, so the pipes keep the required gap.`
+        : `Move ${pipes[0] || f.parts[0]} clear of ${others.join(", ") || f.parts[1]} by at least the required gap.`,
+    };
+    seen.set(key, issue); issues.push(issue);
+  }));
+  return issues;
+}
+
+// Lines where Syntera's verified route is worth adopting: shorter, or passing where the drawn one fails.
+function suggestions(r) {
+  return r.lines.filter((l) => l.optimised.assurance_pass && l.optimised.buildable && !notRun(l.optimised)
+    && ((l.length_saving_mm || 0) > 1 || !l.drawn.assurance_pass));
+}
+
+function whereText(r, w) {
+  if (!w) return null;
+  const el_ = w.el ?? w.z;
+  return `x ${fmt(w.x, 0)}, y ${fmt(w.y, 0)}${el_ !== undefined && el_ !== null ? `, EL +${fmt(el_ / 1000, 3)}` : ""}`;
+}
+
+function showIssue(r, issue) {
+  const w = issue.where;
+  if (!w) return;
+  const origin = r.drawing_origin_mm;
+  // `where` from the backend is in drawing coordinates; the audit's own locations are model coordinates.
+  const modelPt = issue.inDrawing ? (origin ? [w.x - origin[0], w.y - origin[1], w.el] : null) : [w.x, w.y, w.el ?? w.z];
+  const drawingPt = issue.inDrawing ? [w.x, w.y] : (origin ? [w.x + origin[0], w.y + origin[1]] : null);
+  if (state.mode === "3d" && modelPt) model.mark(modelPt);
+  else if (drawingPt) { setMode("2d"); focusOn(...drawingPt); }
+  else if (modelPt) { setMode("3d"); model.mark(modelPt); }
+}
 
 function renderCheck(r) {
   if (!r.supported) return [el("div", { class: "reason soft" }, r.message)];
-  const out = [];
-  if (r.total_cost_saving !== null) {
-    out.push(kv([
-      ["Pipe as drawn", metres(r.total_drawn_length_mm)],
-      ["Syntera's verified route", metres(r.total_optimised_length_mm)],
-      ["Estimated saving", money(r, r.total_cost_saving)],
-    ]));
+  const issues = collectIssues(r);
+  const picks = suggestions(r);
+  const routed = r.lines.some((l) => !notRun(l.optimised));
+  const savedMm = picks.reduce((sum, l) => sum + Math.max(0, l.length_saving_mm || 0), 0);
+  const savedCost = picks.reduce((sum, l) => sum + Math.max(0, l.cost_saving || 0), 0);
+  const ok = issues.length === 0;
+  const box = el("section", { class: `results ${ok ? "ok" : "bad"}`, "aria-label": "Results" });
+  box.append(el("div", { class: "verdict" },
+    el("span", { class: `chip ${ok ? "pass" : "fail"}` }, ok ? "Design OK" : "Design has errors"),
+    el("b", {}, ok ? `No errors in ${r.lines.length} lines` : `${issues.length} error${issues.length === 1 ? "" : "s"} in the drawn design`)));
+  box.append(el("div", { class: "stats" },
+    stat("Main piping as drawn", metres(r.total_drawn_length_mm)),
+    stat("Saving with Syntera's routes", routed ? (savedMm > 0 ? `${metres(savedMm)}` : "none found") : "not checked",
+      routed && savedMm > 0 ? `${fmt(100 * savedMm / r.total_drawn_length_mm, 1)}% · ${money(r, savedCost)} · ${picks.length} reroutes` : null),
+    stat("Lines checked", fmt(r.lines.length, 0), `${r.lines.filter((l) => l.drawn.assurance_pass).length} pass as drawn`)));
+
+  if (issues.length) {
+    box.append(el("h4", {}, "Errors found"));
+    box.append(el("ol", { class: "issues" }, issues.map((issue) => {
+      const ev = issue.evidence || {};
+      const measured = ev.measured_mm !== undefined && ev.measured_mm !== null && ev.required_mm !== undefined && ev.required_mm !== null
+        ? `${fmt(ev.measured_mm, 0)} mm gap, ${fmt(ev.required_mm, 0)} mm required` : null;
+      const at = whereText(r, issue.where);
+      return el("li", {},
+        el("div", { class: "issue-title" }, el("b", {}, issue.title),
+          issue.where ? el("button", { class: "link", type: "button", onclick: () => showIssue(r, issue) }, "Show") : null),
+        el("dl", { class: "issue-kv" },
+          el("dt", {}, "What"), el("dd", {}, issue.what),
+          at ? el("dt", {}, "Where") : null, at ? el("dd", { class: "num" }, at, issue.inDrawing || r.drawing_origin_mm ? "" : " (3D model coordinates)") : null,
+          measured ? el("dt", {}, "Evidence") : null, measured ? el("dd", {}, measured, ", measured on the 3D solids") : null,
+          el("dt", {}, "Fix"), el("dd", { class: "fix" }, issue.fix)));
+    })));
   }
-  out.push(...renderAudit(r, "Design audit of the drawn plant"));
-  if (r.audit) out.push(el("div", { class: "row wrap" }, el("a", { class: "btn", href: `/api/drawings/${r.drawing_id}/assembly/drawn_plant.step` }, "Plant STEP as drawn")));
-  r.lines.forEach((line) => {
-    const d = line.drawn, o = line.optimised;
-    const size = line.outer_diameter_mm ? `${fmt(line.outer_diameter_mm, 1)} mm OD · ` : "";
-    out.push(section(line.name, `${size}grid ${fmt(line.voxel_resolution_mm, 0)} mm`, table([["", ""], ["As drawn", "r"], ["Syntera", "r"]], [
-      el("tr", {}, el("td", {}, "Checks"), el("td", { class: "r" }, verdict(d)), el("td", { class: "r" }, verdict(o))),
-      el("tr", {}, el("td", {}, "Length"), el("td", { class: "r num" }, metres(d.length_mm)), el("td", { class: "r num" }, metres(o.length_mm))),
-      el("tr", {}, el("td", {}, "Bends"), el("td", { class: "r num" }, d.bends), el("td", { class: "r num" }, o.buildable ? o.bends : "–")),
-      el("tr", {}, el("td", {}, "Min clearance"), el("td", { class: "r num" }, d.minimum_clearance_mm === null ? "–" : `${fmt(d.minimum_clearance_mm, 0)} mm`), el("td", { class: "r num" }, o.minimum_clearance_mm === null ? "–" : `${fmt(o.minimum_clearance_mm, 0)} mm`)),
-      el("tr", {}, el("td", {}, "Est. cost"), el("td", { class: "r num" }, money(r, d.estimated_cost)), el("td", { class: "r num" }, money(r, o.estimated_cost))),
-    ])));
-    if (line.ends && line.ends.length) out.push(el("p", { class: "note" }, `Ends: ${line.ends.join("; ")}.`));
-    const base = `/api/drawings/${r.drawing_id}/${line.folder}`;
-    out.push(el("div", { class: "row wrap" },
-      el("a", { class: "btn", href: `/?drawing=${r.drawing_id}&line=${line.folder.split("/").pop()}` }, "Open in route workbench"),
-      d.buildable ? el("a", { class: "btn", href: `${base}/drawn_assembly.step` }, "STEP as drawn") : null,
-      o.buildable ? el("a", { class: "btn", href: `${base}/routed_assembly.step` }, "STEP Syntera route") : null,
-      o.buildable ? el("a", { class: "btn", href: `${base}/layout.dxf` }, "Layout DXF") : null));
-  });
-  out.push(section("Findings", null, el("ul", { class: "findings" }, r.findings.map((text) => el("li", {}, text)))));
-  out.push(section("What was assumed", null, table([["Quantity"], ["Value"], ["Source"]], r.assumptions.map((a) =>
-    el("tr", { title: a.note }, el("td", {}, a.quantity), el("td", { class: "cell-text" }, a.value),
-      el("td", {}, el("span", { class: `chip ${a.source === "default" ? "warn" : "pass"}` }, a.source)))))));
-  out.push(el("a", { class: "btn", href: `/api/drawings/${r.drawing_id}/assembly/piping_check.json`, download: "piping_check.json" }, "Piping check JSON"));
+
+  if (picks.length) {
+    box.append(el("h4", {}, "Suggested reroutes"));
+    box.append(el("p", { class: "note method" }, "How each route was found: the shortest path that keeps every clearance, with a penalty for each bend, then verified on the exact CAD solid (no clash, full bend radius, ends on the nozzle axis)."));
+    box.append(el("ul", { class: "reroutes" }, picks.map((line) => rerouteItem(r, line))));
+  } else if (routed) {
+    box.append(el("p", { class: "note" }, "Syntera found no verified route shorter than the drawn ones."));
+  } else {
+    box.append(el("p", { class: "note" }, "Shorter routes were not searched. Tick \"Look for shorter routes\" and run again to get savings."));
+  }
+
+  const files = el("div", { class: "row wrap" },
+    el("a", { class: "btn", href: `/api/drawings/${r.drawing_id}/assembly/piping_check.json`, download: "piping_check.json" }, "Check report JSON"),
+    r.audit ? el("a", { class: "btn", href: `/api/drawings/${r.drawing_id}/assembly/drawn_plant.step` }, "Plant STEP as drawn") : null);
+  const defaults = r.assumptions.filter((a) => a.source === "default");
+  box.append(el("div", { class: "trace" },
+    el("p", { class: "note" }, `Every number above is measured on CAD solids by deterministic checks. ${defaults.length ? `${defaults.length} input${defaults.length === 1 ? " was" : "s were"} assumed, not read from the drawing (${defaults.map((a) => a.quantity.toLowerCase()).join(", ")}); see the details below.` : "All inputs were read from the drawing."}`),
+    files));
+
+  return [box, ...detailFolds(r)];
+}
+
+function stat(label, value, sub) {
+  return el("div", { class: "stat" }, el("span", { class: "label" }, label), el("b", { class: "num" }, value), sub ? el("span", { class: "note num" }, sub) : null);
+}
+
+function rerouteItem(r, line) {
+  const d = line.drawn, o = line.optimised, why = line.route_rationale;
+  const gain = d.minimum_clearance_mm !== null && o.minimum_clearance_mm !== null ? o.minimum_clearance_mm - d.minimum_clearance_mm : null;
+  const facts = [];
+  if ((line.length_saving_mm || 0) > 1) facts.push(`${metres(line.length_saving_mm)} shorter (${fmt(line.length_saving_percent, 1)}%)`);
+  else facts.push("same length");
+  if (line.bend_saving) facts.push(`${Math.abs(line.bend_saving)} ${line.bend_saving > 0 ? "fewer" : "more"} bend${Math.abs(line.bend_saving) === 1 ? "" : "s"}`);
+  if ((line.cost_saving || 0) > 0) facts.push(`${money(r, line.cost_saving)} less`);
+  if (gain !== null && gain > 1) facts.push(`clearance +${fmt(gain, 0)} mm (${fmt(d.minimum_clearance_mm, 0)} → ${fmt(o.minimum_clearance_mm, 0)})`);
+  const reasons = [];
+  if (!d.assurance_pass) reasons.push(`Fixes the drawn route, which fails (${(d.failure_reasons[0] || "see errors").replace(/\.$/, "")}).`);
+  if (why && why.summary) reasons.push(why.summary);
+  if (why && why.limiting && why.limiting.length) {
+    reasons.push(`Limited by ${why.limiting.map((p) => `${p.name} (${fmt(p.distance_mm, 0)} mm, needs ${fmt(p.required_mm, 0)})`).join(", ")}.`);
+  }
+  const moved = why && why.nozzle_moves_mm ? Math.max(why.nozzle_moves_mm.start || 0, why.nozzle_moves_mm.end || 0) : line.nozzle_shift_mm;
+  const cautions = [];
+  if (moved && moved > 1) cautions.push(`Nozzles moved up to ${fmt(moved, 0)} mm onto the ${fmt(line.voxel_resolution_mm, 0)} mm grid.`);
+  if (why && why.plant_check) {
+    const pc = why.plant_check;
+    cautions.push(pc.passes ? `Re-checked against the whole plant: clear, closest part ${pc.closest_part || "–"} at ${fmt(pc.minimum_clearance_mm, 0)} mm.`
+      : `Re-checked against the whole plant: clashes with ${pc.clashes.join(", ")}.`);
+  } else {
+    cautions.push("Not yet re-checked against the other drawn lines.");
+  }
+  const plantBad = why && why.plant_check && !why.plant_check.passes;
+  return el("li", { class: plantBad ? "warn" : "" },
+    el("div", { class: "issue-title" }, el("b", {}, line.name), el("span", { class: "num" }, `${metres(d.length_mm)} → ${metres(o.length_mm)}`),
+      el("button", { class: "link", type: "button", onclick: () => openBench(r.drawing_id, line) }, "Open in workbench")),
+    el("p", { class: "facts" }, facts.join(" · ")),
+    reasons.length ? el("p", { class: "why" }, reasons.join(" ")) : null,
+    el("p", { class: "note" }, cautions.join(" ")));
+}
+
+function detailFolds(r) {
+  const out = [];
+  out.push(fold("Line by line", `${r.lines.length} lines`, table([["Line"], ["Drawn"], ["Length", "r"], ["Syntera", "r"], [""]],
+    r.lines.map((line) => {
+      const d = line.drawn, o = line.optimised;
+      return el("tr", { title: [...d.failure_reasons, ...o.failure_reasons].join("; ") },
+        el("td", { class: "cell-text" }, line.name), el("td", {}, verdict(d)),
+        el("td", { class: "r num" }, metres(d.length_mm)),
+        el("td", { class: "r num" }, o.buildable && !notRun(o) ? metres(o.length_mm) : verdict(o)),
+        el("td", { class: "r" }, el("button", { class: "link", type: "button", title: "Open this line in the route workbench", onclick: () => openBench(r.drawing_id, line) }, "Open")));
+    })),
+  el("p", { class: "note" }, "Hover a row for its check messages. STEP and DXF files for each line are in the workbench's Assurance tab.")));
+  const audit = r.audit ? renderAudit(r, "Whole-plant audit") : [];
+  out.push(fold("Audit rules and assumptions", r.audit ? r.audit.summary : null, ...audit,
+    section("What was assumed", null, table([["Quantity"], ["Value"], ["Source"]], r.assumptions.map((a) =>
+      el("tr", { title: a.note }, el("td", {}, a.quantity), el("td", { class: "cell-text" }, a.value),
+        el("td", {}, el("span", { class: `chip ${a.source === "default" ? "warn" : "pass"}` }, a.source)))))),
+    section("All check messages", `${r.findings.length}`, el("ul", { class: "findings" }, r.findings.map((text) => el("li", {}, text))))));
   return out;
+}
+
+// ---- route workbench, shown inside this page ----
+function openBench(drawingId, line) {
+  const folder = line.folder.split("/").pop();
+  benchAt(`/?embed=1&drawing=${encodeURIComponent(drawingId)}&line=${encodeURIComponent(folder)}`, line.name);
+}
+
+function benchAt(src, title) {
+  $("bench-title").textContent = title;
+  if ($("bench-frame").getAttribute("src") !== src) $("bench-frame").setAttribute("src", src);
+  $("bench").hidden = false;
+  document.querySelector(".drawings-main").classList.add("bench-open");
+  model.stop();
+}
+
+function closeBench() {
+  $("bench").hidden = true;
+  document.querySelector(".drawings-main").classList.remove("bench-open");
+  if (state.mode === "3d") model.start();
 }
 
 function setMode(mode) {
@@ -331,7 +500,7 @@ function setMode(mode) {
 
 // Minimal orbit viewer for the inferred assembly (Z up, millimetres).
 const model = (() => {
-  let renderer = null, scene, camera, world, frameId = null, bounds = null;
+  let renderer = null, scene, camera, world, frameId = null, bounds = null, marker = null;
   const orbit = { target: null, yaw: -0.9, pitch: 0.55, dist: 1000 };
   function init() {
     if (renderer || typeof THREE === "undefined") return;
@@ -359,6 +528,7 @@ const model = (() => {
   function load(payload) {
     init();
     if (!renderer) return;
+    marker = null;
     if (world) { scene.remove(world); world.traverse((o) => { o.geometry && o.geometry.dispose(); o.material && o.material.dispose(); }); }
     world = new THREE.Group(); scene.add(world);
     bounds = new THREE.Box3();
@@ -396,8 +566,22 @@ const model = (() => {
     renderer.render(scene, camera);
     frameId = requestAnimationFrame(frame);
   }
+  // Ring and sphere around a reported error location, then orbit around it.
+  function mark(point) {
+    if (!renderer || !point || point.some((v) => v === null || v === undefined || Number.isNaN(v))) return;
+    if (marker) { world.remove(marker); marker.traverse((o) => { o.geometry && o.geometry.dispose(); o.material && o.material.dispose(); }); }
+    const size = Math.max(150, bounds.getSize(new THREE.Vector3()).length() * 0.012);
+    marker = new THREE.Group();
+    marker.add(new THREE.Mesh(new THREE.SphereGeometry(size, 24, 16), new THREE.MeshBasicMaterial({ color: 0xff2d55, transparent: true, opacity: 0.35, depthTest: false })));
+    marker.add(new THREE.Mesh(new THREE.SphereGeometry(size * 0.25, 16, 12), new THREE.MeshBasicMaterial({ color: 0xff2d55, depthTest: false })));
+    marker.position.set(...point);
+    marker.renderOrder = 10;
+    world.add(marker);
+    orbit.target.set(...point);
+    orbit.dist = size * 40;
+  }
   return {
-    load, fit,
+    load, fit, mark,
     zoom(factor) { orbit.dist *= factor; },
     start() { if (renderer && frameId === null) frameId = requestAnimationFrame(frame); },
     stop() { if (frameId !== null) cancelAnimationFrame(frameId); frameId = null; },
@@ -415,6 +599,7 @@ async function uploadPid(file) {
     state.check = null;
     document.querySelectorAll("#drawing-list li").forEach((li) => li.setAttribute("aria-selected", "false"));
     $("drop").hidden = true;
+    $("panel-title").textContent = "P&ID to 3D";
     $("details").replaceChildren(...renderPlant(payload));
     $("mode-3d").disabled = false;
     $("mode-2d").disabled = true;
@@ -450,7 +635,7 @@ function renderPlant(payload) {
       el("a", { class: "btn", href: `${base}/plant_layout.json` }, "Layout JSON")),
     section("Lines", `grid ${fmt(r.voxel_resolution_mm, 0)} mm`, table([["Line"], ["Length", "r"], ["Checks"]],
       r.routes.map((route) => el("tr", { title: route.failure_reasons.join("; ") },
-        el("td", {}, route.routed ? el("a", { href: `/?pid=${payload.plant_id}&route=${route.folder}`, title: "Open in route workbench" }, route.line) : route.line,
+        el("td", {}, route.routed ? el("button", { class: "link", type: "button", title: "Open in route workbench", onclick: () => benchAt(`/?embed=1&pid=${encodeURIComponent(payload.plant_id)}&route=${encodeURIComponent(route.folder)}`, route.line) }, route.line) : route.line,
           el("div", { class: "note line-label" }, route.label)),
         el("td", { class: "r num" }, route.length_mm === null ? "–" : `${fmt(route.length_mm / 1000, 2)} m`),
         el("td", {}, el("span", { class: `chip ${route.assurance_pass ? "pass" : "fail"}` }, route.assurance_pass ? "pass" : "not routed")))))),
@@ -475,6 +660,7 @@ async function uploadAudit(file) {
     state.check = null;
     document.querySelectorAll("#drawing-list li").forEach((li) => li.setAttribute("aria-selected", "false"));
     $("drop").hidden = true;
+    $("panel-title").textContent = "STEP assembly audit";
     $("details").replaceChildren(
       section("Design audit of a STEP assembly", null, el("p", { class: "note" },
         "Solids that are a single swept tube up to DN600 are treated as pipe; everything else as equipment. Red solids are named in a failing finding.")),
@@ -548,6 +734,8 @@ async function show(drawingId) {
   $("drop").hidden = true;
   $("stage").hidden = false;
   $("sheet-img").src = `/api/drawings/${drawingId}/drawing.svg?v=${s.render_version}`;
+  $("panel-title").textContent = "Design check";
+  closeBench();
   renderDetails(s);
   document.querySelectorAll("#drawing-list li").forEach((li) => li.setAttribute("aria-selected", String(li.dataset.id === drawingId)));
   history.replaceState(null, "", `/drawings#${drawingId}`);
@@ -585,6 +773,10 @@ async function upload(file) {
 
 async function init() {
   bindSheet();
+  $("bench-back").addEventListener("click", closeBench);
+  $("open-demo-bench").addEventListener("click", (event) => { event.target.closest("details").open = false; benchAt("/?embed=1", "Demo skid"); });
+  document.addEventListener("keydown", (event) => { if (event.key === "Escape" && !$("bench").hidden) closeBench(); });
+  document.querySelectorAll(".menu input[type=file]").forEach((input) => input.addEventListener("change", () => { input.closest("details").open = false; }));
   $("audit-input").addEventListener("change", (event) => {
     const file = event.target.files[0];
     if (file) uploadAudit(file);

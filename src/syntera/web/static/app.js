@@ -3,6 +3,9 @@
 const snapshotEl = document.getElementById("snapshot");
 const DATA = snapshotEl ? JSON.parse(snapshotEl.textContent) : { geometries: {}, scenarios: [] };
 const LIVE = !snapshotEl;
+// ?embed=1: shown inside the Drawings page, which supplies its own header and navigation.
+const EMBEDDED = new URLSearchParams(location.search).get("embed") === "1" && window.top !== window;
+if (EMBEDDED) document.documentElement.classList.add("embedded");
 const $ = (s) => document.querySelector(s);
 const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 const fmt = (v, d = 1) => v == null || !isFinite(v) ? "–" : Number(v).toLocaleString("en-GB", { minimumFractionDigits: d, maximumFractionDigits: d });
@@ -569,7 +572,7 @@ async function openLayout(button) {
     });
     const body = await r.json();
     if (!r.ok) throw new Error(body.detail || r.statusText);
-    location.href = `/drawings#${body.drawing_id}`;
+    (EMBEDDED ? window.top : window).location.href = `/drawings#${body.drawing_id}`;
   } catch (error) {
     button.disabled = false;
     button.textContent = `Could not open layout: ${error.message}`;

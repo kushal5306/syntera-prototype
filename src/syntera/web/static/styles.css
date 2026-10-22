@@ -194,3 +194,8 @@ svg.profile { width: 100%; height: auto; display: block; }
   #tri-count { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+/* Inside the Drawings page (?embed=1): that page has the brand and navigation. */
+.embedded .topbar .brand, .embedded .topbar a[href="/drawings"], .embedded .titleblock { display: none; }
+.embedded .app { padding-block: 8px; padding-inline: 8px; gap: 8px; height: 100vh; grid-template-rows: auto auto minmax(0, 1fr); }
+.embedded .main { min-height: 0; }

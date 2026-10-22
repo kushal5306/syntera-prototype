@@ -19,9 +19,14 @@
     </div>
     <div class="spacer"></div>
     <div class="mode-chip" id="converter-chip"><i></i><span>Checking DWG support…</span></div>
-    <a class="btn" href="/">Route workbench</a>
-    <label class="btn upload-btn" title="Check any STEP assembly for clashes, clearances, bend radii and unconnected ends">Audit STEP assembly<input id="audit-input" type="file" accept=".step,.stp" hidden></label>
-    <label class="btn upload-btn" title="Upload a DEXPI XML P&amp;ID export to get a proposed 3D layout">P&amp;ID to 3D (DEXPI XML)<input id="pid-input" type="file" accept=".xml" hidden></label>
+    <details class="menu">
+      <summary class="btn">Other inputs</summary>
+      <div class="menu-list">
+        <label class="upload-btn" title="Check any STEP assembly for clashes, clearances, bend radii and unconnected ends">Audit a STEP assembly<input id="audit-input" type="file" accept=".step,.stp" hidden></label>
+        <label class="upload-btn" title="Upload a DEXPI XML P&amp;ID export to get a proposed 3D layout">P&amp;ID to 3D (DEXPI XML)<input id="pid-input" type="file" accept=".xml" hidden></label>
+        <button type="button" id="open-demo-bench">Demo skid in the route workbench</button>
+      </div>
+    </details>
     <label class="btn primary upload-btn">Upload DWG or DXF<input id="file-input" type="file" accept=".dwg,.dxf" hidden></label>
   </header>
 
@@ -56,9 +61,19 @@
     </section>
 
     <aside class="panel analysis">
-      <div class="panel-head"><h2>What Syntera read</h2></div>
-      <div class="scroll"><div class="tabpanel" id="details"><p class="note">Upload a drawing to see its layers, dimensions and notes.</p></div></div>
+      <div class="panel-head"><h2 id="panel-title">Design check</h2></div>
+      <div class="scroll"><div class="tabpanel" id="details"><p class="note">Upload a piping plan or GA drawing. Syntera builds it in 3D, checks the design and looks for shorter piping.</p></div></div>
     </aside>
+
+    <section class="bench" id="bench" hidden aria-label="Route workbench">
+      <div class="bench-bar">
+        <button class="btn" id="bench-back" type="button">← Back to the check</button>
+        <b>Route workbench</b><span class="note" id="bench-title"></span>
+        <span class="spacer"></span>
+        <span class="note">Edit the line's inputs in the Spec tab and press Generate route to re-check it.</span>
+      </div>
+      <iframe id="bench-frame" title="Route workbench"></iframe>
+    </section>
   </main>
 </div>
     <script src="/assets/vendor/three.min.js"></script>
