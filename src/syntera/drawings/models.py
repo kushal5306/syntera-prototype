@@ -139,6 +139,73 @@ class RouteCheck(DrawingModel):
     too_close_to: list[str] = Field(default_factory=list)
 
 
+class RouteCost(DrawingModel):
+    """What the router minimises, for one route: length plus a penalty per bend."""
+
+    length_mm: float | None
+    bends: int
+    bend_penalty_mm: float
+    score_mm: float | None
+
+
+class Limit(DrawingModel):
+    """A part close to the proposed route: what shaped it."""
+
+    name: str
+    distance_mm: float
+    required_mm: float
+
+
+class PlantCheck(DrawingModel):
+    """The proposed route checked against every other drawn pipe, nozzle and solid."""
+
+    passes: bool
+    clashes: list[str]
+    minimum_clearance_mm: float | None
+    closest_part: str | None
+
+
+class RouteRationale(DrawingModel):
+    """Why Syntera proposes its route, in terms a reviewer can check."""
+
+    summary: str
+    objective: str
+    weights: dict[str, float]
+    drawn: RouteCost
+    proposed: RouteCost
+    limiting: list[Limit]
+    nozzle_moves_mm: dict[str, float]
+    plant_check: PlantCheck | None
+
+
+class Location(DrawingModel):
+    """A point in drawing coordinates: plan x and y, and elevation, in mm."""
+
+    x: float
+    y: float
+    el: float
+
+
+class Evidence(DrawingModel):
+    measured_mm: float | None = None
+    required_mm: float | None = None
+    text: str = ""
+
+
+class Issue(DrawingModel):
+    """One real error in the drawing as drawn, with where it is, the evidence and a fix."""
+
+    id: str
+    rule: str
+    title: str
+    lines: list[str]
+    parts: list[str]
+    what: str
+    where: Location | None
+    evidence: Evidence
+    fix: str
+
+
 class LineCheck(DrawingModel):
     name: str
     folder: str
@@ -155,6 +222,7 @@ class LineCheck(DrawingModel):
     bend_saving: int | None
     cost_saving: float | None
     findings: list[str]
+    route_rationale: RouteRationale | None = None
 
 
 class PipingCheckReport(DrawingModel):
@@ -177,3 +245,6 @@ class PipingCheckReport(DrawingModel):
     findings: list[str]
     # every drawn pipe, nozzle, item of equipment and structure checked against each other
     audit: AssemblyAudit | None = None
+    # add to a model x/y (mm) to get the drawing's own coordinates
+    drawing_origin_mm: tuple[float, float] | None = None
+    issues: list[Issue] = Field(default_factory=list)
