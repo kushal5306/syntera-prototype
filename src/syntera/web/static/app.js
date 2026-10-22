@@ -378,7 +378,7 @@ const TABS = {
       ["Route found", a.route_found, a.route_found ? `${fmt(a.route_length_mm, 1)} mm, ${a.number_of_bends} bends` : "A* found no feasible path", null],
       ["Collision-free (exact B-rep)", a.collision_free, a.collision_free ? "No solid intersection" : "Not verified", null],
       ["Clearance", a.minimum_measured_clearance_mm != null && a.minimum_measured_clearance_mm >= a.required_clearance_mm, `${fmt(a.minimum_measured_clearance_mm, 1)} mm measured, ${fmt(a.required_clearance_mm, 1)} mm required`, a.minimum_measured_clearance_mm ? a.required_clearance_mm / a.minimum_measured_clearance_mm : null],
-      ["Bend radius", a.minimum_generated_bend_radius_mm != null && a.minimum_generated_bend_radius_mm >= a.required_bend_radius_mm, `${fmt(a.minimum_generated_bend_radius_mm, 1)} mm generated, ${fmt(a.required_bend_radius_mm, 1)} mm minimum`, a.minimum_generated_bend_radius_mm ? a.required_bend_radius_mm / a.minimum_generated_bend_radius_mm : null],
+      ["Bend radius", a.minimum_generated_bend_radius_mm != null && a.minimum_generated_bend_radius_mm + 1e-6 >= a.required_bend_radius_mm, `${fmt(a.minimum_generated_bend_radius_mm, 2)} mm generated, ${fmt(a.required_bend_radius_mm, 2)} mm minimum`, a.minimum_generated_bend_radius_mm ? a.required_bend_radius_mm / a.minimum_generated_bend_radius_mm : null],
       ["Start port alignment", a.start_port_alignment, "Tube leaves along the nozzle axis", null],
       ["End port alignment", a.end_port_alignment, "Tube enters along the nozzle axis", null],
     ];
