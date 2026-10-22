@@ -81,8 +81,15 @@ next run. three.js r128 (MIT, `static/vendor/three.LICENSE`) is vendored so the
 container works offline; web fonts fall back to system fonts when offline.
 
 The demo writes `assembly.step`, `routed_assembly.step`, `route.json`,
-`assurance_report.json`, `route_preview.png`, and `layout.dxf`. Outputs are
-intentionally ignored by Git.
+`assurance_report.json`, `route_preview.png`, `layout.dxf` and `rationale.json`. Outputs
+are intentionally ignored by Git.
+
+`rationale.json` says why each value the run used has its value: one record per parameter
+path with its source (`user`, `default`, `rule`, `calculation`, `drawing` or `inferred`),
+the versioned rule id and inputs behind it, and a short explanation. Runs built from a
+P&ID or a drawing record the sizing, clearance, grid and cost rules they applied, and the
+P&ID plant folder adds equipment sizes, positions and the skid envelope. Records explain
+values only; they never carry or change an assurance verdict.
 
 `layout.dxf` is a general-arrangement drawing in millimetres: plan, front elevation and
 right elevation (third-angle) of the equipment, the nozzles and the routed tube drawn

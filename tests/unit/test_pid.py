@@ -8,6 +8,7 @@ import pytest
 from syntera.pid.build import PLANT_STEP, REPORT_FILE, build_plant
 from syntera.pid.dexpi import PidError, read_dexpi
 from syntera.pid.layout import envelope, outside_diameter, place
+from syntera.rationale import RATIONALE_FILE, RationaleReport
 
 
 def test_dexpi_connectivity_passes_through_inline_items_and_drops_blind_stubs(dexpi_xml):
@@ -72,3 +73,18 @@ def test_plant_routes_and_verifies_every_line(dexpi_xml, tmp_path):
     assert saved["routed"] == 3
     assert (tmp_path / "plant" / PLANT_STEP).is_file()
     assert (tmp_path / "plant" / "route-1" / "config.json").is_file()
+
+    plant_why = RationaleReport.model_validate_json(
+        (tmp_path / "plant" / RATIONALE_FILE).read_text()
+    )
+    assert plant_why.get("equipment.T100.size").source == "calculation"
+    assert plant_why.get("equipment.P101.size").source == "default"
+    assert plant_why.get("voxel_resolution").value == report.voxel_resolution_mm
+    for route in report.routes:
+        why = RationaleReport.model_validate_json(
+            (tmp_path / "plant" / route.folder / RATIONALE_FILE).read_text()
+        )
+        # every routing value was chosen by a stated rule, none claimed as the user's
+        assert "user" not in {entry.source for entry in why.entries}
+        assert why.get("tube.outer_diameter").value == route.outer_diameter_mm
+        assert why.get("voxel_resolution").source == "calculation"

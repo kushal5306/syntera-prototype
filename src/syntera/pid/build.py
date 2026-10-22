@@ -21,7 +21,10 @@ from syntera.geometry.cad import export_step, obstacle_shape
 from syntera.geometry.centreline import ArcSegment, centreline_segments
 from syntera.pid.layout import Layout, NozzlePort, clearance_for, outside_diameter, place
 from syntera.pid.models import PidDocument, PlacedRoute, PlantLayoutReport, Point3
+from syntera.pid.rationale import line_rationale, plant_rationale
 from syntera.pipeline import execute_pipeline
+from syntera.rationale import RATIONALE_FILE, build_report, grid_rationale
+from syntera.reporting.output import write_json
 from syntera.schemas import (
     BoxObstacle,
     CylinderObstacle,
@@ -136,6 +139,7 @@ def build_plant(document: PidDocument, output: Path, *, currency: str = "USD") -
     provisional = place(document, 250.0)
     step = voxel_resolution(provisional.workspace, PLANT_MAX_VOXELS)
     layout = provisional if step == 250.0 else place(document, step)
+    grid = grid_rationale(step, provisional.workspace, PLANT_MAX_VOXELS)
     reserved = {
         terminal_id: _reserve(port, _od_of(document, terminal_id))
         for terminal_id, port in layout.ports.items()
@@ -197,7 +201,12 @@ def build_plant(document: PidDocument, output: Path, *, currency: str = "USD") -
                     bend=4 * step, obstacle_proximity=step, port_direction=1000
                 ),
             )
-            result = execute_pipeline(config, folder, create_preview=False)
+            result = execute_pipeline(
+                config,
+                folder,
+                create_preview=False,
+                rationale=[*line_rationale(connection.nominal_diameter, outer, step), grid],
+            )
             (folder / CONFIG_FILE).write_text(
                 json.dumps(config.model_dump(mode="json"), indent=2) + "\n", encoding="utf-8"
             )
@@ -279,6 +288,12 @@ def build_plant(document: PidDocument, output: Path, *, currency: str = "USD") -
         layout_score_mm=round(layout.score_mm, 3),
         assumptions=_assumptions(layout, step),
         skipped=document.skipped,
+    )
+    write_json(
+        build_report(
+            f"{document.filename} proposed layout", plant_rationale(document, layout, step), [grid]
+        ),
+        output / RATIONALE_FILE,
     )
     (output / REPORT_FILE).write_text(
         json.dumps(report.model_dump(mode="json"), indent=2, sort_keys=True) + "\n",

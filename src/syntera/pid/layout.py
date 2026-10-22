@@ -56,6 +56,7 @@ class Envelope:
     size: Point3
     source: str
     note: str
+    rule_id: str | None = None  # the sizing rule, when the size is not simply read or assumed
 
 
 def envelope(item: PidEquipment) -> Envelope:
@@ -73,12 +74,14 @@ def envelope(item: PidEquipment) -> Envelope:
             diameter = math.sqrt(4 * volume / (math.pi * length))
         if length and diameter:
             note = f"{diameter:.0f} mm diameter x {length:.0f} mm from the P&ID"
+            rule = None
             if volume and not (a.get("InsideDiameter") or a.get("OutsideDiameter")):
                 note = (
                     f"{diameter:.0f} mm diameter from {volume / 1e9:g} m3 over "
                     f"{length:.0f} mm length"
                 )
-            return Envelope("cylinder", "z", (diameter, diameter, length), "pid", note)
+                rule = "pid.vessel_diameter_from_capacity.v1"
+            return Envelope("cylinder", "z", (diameter, diameter, length), "pid", note, rule)
     if "Column" in name and a.get("Height") and diameter:
         height = a["Height"]
         return Envelope(
@@ -92,18 +95,25 @@ def envelope(item: PidEquipment) -> Envelope:
         return Envelope(
             "cylinder", "x", (length, diameter, diameter), source,
             f"shell {diameter:.0f} mm x {length:.0f} mm (tube length + 600 mm heads)",
+            "pid.shell_from_tube_length.v1",
         )  # fmt: skip
     if "PlateHeatExchanger" in name and a.get("PlateHeight"):
         width, height = a.get("PlateWidth", 800), a["PlateHeight"]
         return Envelope(
             "box", "z", (width + 400, 800, height + 300), "pid",
             "plate size from the P&ID plus frame; 800 mm pack depth assumed",
+            "pid.plate_frame_allowance.v1",
         )  # fmt: skip
     for word, (shape, axis, x, y, z) in CLASS_DEFAULTS:
         if word in name:
-            return Envelope(shape, axis, (x, y, z), "default", f"{word} class default")
+            return Envelope(
+                shape, axis, (x, y, z), "default", f"{word} class default",
+                "pid.class_default_envelope.v1",
+            )  # fmt: skip
     shape, axis, x, y, z = GENERIC_DEFAULT
-    return Envelope(shape, axis, (x, y, z), "default", "generic 1 m cube")
+    return Envelope(
+        shape, axis, (x, y, z), "default", "generic 1 m cube", "pid.class_default_envelope.v1"
+    )
 
 
 @dataclass(frozen=True)

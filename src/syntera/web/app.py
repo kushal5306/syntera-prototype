@@ -42,6 +42,7 @@ DOWNLOADS = {
     "import_report.json",
     "metrics.json",
     "layout.dxf",
+    "rationale.json",
 }
 
 

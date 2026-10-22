@@ -12,16 +12,22 @@ from fastapi.responses import FileResponse
 
 from syntera.pid.build import CONFIG_FILE, PLANT_STEP, REPORT_FILE, PlantResult, build_plant
 from syntera.pid.dexpi import MAX_XML_BYTES, PidError, read_dexpi
+from syntera.rationale import RATIONALE_FILE
 from syntera.web.mesh import shape_mesh
 
 PLANT_ID = re.compile(r"^[0-9a-f]{16}$")
 ROUTE_FOLDER = re.compile(r"^route-[1-9][0-9]{0,2}$")
-PLANT_FILES = {REPORT_FILE: "application/json", PLANT_STEP: "application/step"}
+PLANT_FILES = {
+    REPORT_FILE: "application/json",
+    PLANT_STEP: "application/step",
+    RATIONALE_FILE: "application/json",
+}
 ROUTE_FILES = {
     CONFIG_FILE: "application/json",
     "routed_assembly.step": "application/step",
     "assurance_report.json": "application/json",
     "layout.dxf": "application/dxf",
+    RATIONALE_FILE: "application/json",
 }
 EQUIPMENT_COLOUR = (0.88, 0.34, 0.25)
 PIPE_COLOUR = (0.08, 0.72, 0.82)

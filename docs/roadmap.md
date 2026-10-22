@@ -26,7 +26,7 @@ Status values: `todo`, `in-review` (PR open), `done` (merged), `blocked` (reason
 
 | # | ID | Milestone | Layer | Depends on | Status | PR |
 |---|----|-----------|-------|------------|--------|----|
-| 1 | A1 | Rationale schema | Design model | - | todo | |
+| 1 | A1 | Rationale schema | Design model | - | in-review | (PR pending) |
 | 2 | A2 | Deterministic engineering rule library | Design model | A1 | todo | |
 | 3 | A3 | Canonical design document | Design model | A1 | todo | |
 | 4 | B1 | Multi-line design from the design document | 3D engine | A3 | todo | |

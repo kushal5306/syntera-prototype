@@ -26,6 +26,7 @@ from syntera.drawings.models import (
     InferredEquipment,
     LayerRole,
 )
+from syntera.rationale import Rationale
 from syntera.schemas import BoxObstacle, CylinderObstacle, Point3, TubeSpecification
 
 Point2 = tuple[float, float]
@@ -77,6 +78,7 @@ class InferredLayout:
     tube: TubeSpecification | None = None
     assumptions: list[Assumption] = field(default_factory=list)
     views: list[str] = field(default_factory=list)
+    rationale: list[Rationale] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -361,6 +363,66 @@ def _source(user_value: float | None, drawing_value: float | None) -> str:
     return "drawing" if drawing_value is not None else "default"
 
 
+def tube_rationale(
+    tube: TubeSpecification,
+    *,
+    od_source: str,
+    radius_source: str,
+    radius_clamped: bool,
+    clearance_source: str,
+) -> list[Rationale]:
+    """Why the inferred tube has its OD, bend radius and clearance (user, drawing or rule)."""
+    stated = {
+        "user": ("user", None, "as given in the check options."),
+        "drawing": ("drawing", None, "as drawn or annotated on the drawing."),
+    }
+    od = tube.outer_diameter
+    records = []
+    for path, value, source, default_rule, default_text in (
+        (
+            "tube.outer_diameter",
+            od,
+            od_source,
+            None,
+            "not given or drawn; DN50 (60.3 mm OD) is assumed.",
+        ),
+        (
+            "tube.minimum_bend_radius",
+            tube.minimum_bend_radius,
+            radius_source,
+            "drawing.bend_radius_long_radius.v1",
+            "not given or drawn; 1.5 x the {outer_diameter_mm:g} mm OD (long-radius elbow).",
+        ),
+        (
+            "tube.minimum_clearance",
+            tube.minimum_clearance,
+            clearance_source,
+            "drawing.clearance_half_od.v1",
+            "not given or drawn; half the {outer_diameter_mm:g} mm OD.",
+        ),
+    ):
+        kind, rule, text = stated.get(
+            source, ("rule" if default_rule else "default", default_rule, default_text)
+        )
+        if path == "tube.minimum_bend_radius" and radius_clamped:
+            kind, rule = "rule", "drawing.bend_radius_at_least_tube_radius.v1"
+            text = (
+                "raised to the tube radius, the smallest bend a {outer_diameter_mm:g} mm OD allows."
+            )
+        records.append(
+            Rationale(
+                path=path,
+                value=value,
+                unit="mm",
+                source=kind,  # type: ignore[arg-type]
+                rule_id=rule,
+                inputs={"outer_diameter_mm": od},
+                explanation="{value} {unit}: " + text,
+            )
+        )
+    return records
+
+
 def infer_layout(
     doc: Drawing, mm_per_unit: float | None, options: AssemblyOptions
 ) -> InferredLayout:
@@ -453,8 +515,8 @@ def infer_layout(
         if i.role in {"pipe", "pipe_centreline"} and i.entity.dxftype() == "ARC"
     )
     drawn_radius = _text_value(texts, "bend_radius") or (arc_radii[0] if arc_radii else None)
-    radius = options.bend_radius_mm or drawn_radius or 1.5 * od
-    radius = max(radius, od / 2)
+    chosen_radius = options.bend_radius_mm or drawn_radius or 1.5 * od
+    radius = max(chosen_radius, od / 2)
     drawn_clearance = _text_value(texts, "clearance")
     clearance = (
         options.clearance_mm
@@ -695,4 +757,11 @@ def infer_layout(
         tube=tube,
         assumptions=assumptions,
         views=views,
+        rationale=tube_rationale(
+            tube,
+            od_source=_source(options.outer_diameter_mm, drawn_od),
+            radius_source=_source(options.bend_radius_mm, drawn_radius),
+            radius_clamped=radius != chosen_radius,
+            clearance_source=_source(options.clearance_mm, drawn_clearance),
+        ),
     )

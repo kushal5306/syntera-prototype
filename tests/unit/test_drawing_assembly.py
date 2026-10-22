@@ -19,6 +19,7 @@ from syntera.drawings.piping_check import (
 )
 from syntera.drawings.reader import drawing_units, load_dxf
 from syntera.pipeline import execute_pipeline
+from syntera.rationale import RATIONALE_FILE, RationaleReport
 
 PROJECT = Path(__file__).parents[2]
 
@@ -98,6 +99,11 @@ def test_plan_only_layout_uses_stated_defaults(plan_layout_dxf):
     assert sources["Equipment height"] == "default"
     assert sources["Pipe centreline elevation"] == "default"
     assert sources["Pipe outside diameter"] == "drawing"  # from the nozzle circles
+    why = {record.path: record for record in layout.rationale}
+    assert why["tube.outer_diameter"].source == "drawing"
+    assert why["tube.outer_diameter"].value == layout.tube.outer_diameter
+    assert why["tube.minimum_bend_radius"].source == "rule"
+    assert why["tube.minimum_clearance"].source == "rule"
     assert layout.lines[0].points[0] == (300.0, 600.0, 500.0)
     assert layout.lines[0].orthogonal
 
@@ -119,6 +125,10 @@ def test_piping_check_finds_the_clash_and_a_verified_shorter_route(plan_layout_d
     assert (folder / REPORT_FILE).is_file()
     for name in ("drawn_assembly.step", "routed_assembly.step", "config.json", "layout.dxf"):
         assert (folder / "line-1" / name).is_file()
+    why = RationaleReport.model_validate_json((folder / "line-1" / RATIONALE_FILE).read_text())
+    assert why.get("tube.outer_diameter").source == "drawing"
+    assert why.get("voxel_resolution").value == line.voxel_resolution_mm
+    assert "user" not in {entry.source for entry in why.entries}
 
 
 def test_user_heights_change_the_assembly_and_the_answer(plan_layout_dxf, tmp_path):
