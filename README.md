@@ -348,6 +348,9 @@ See [docs/architecture.md](docs/architecture.md) for detail.
 
 ## Next milestones
 
+The intelligent CAD assistant roadmap, with milestones per architecture layer and the
+daily run protocol, is in [docs/roadmap.md](docs/roadmap.md).
+
 Phase 2 now includes conservative STEP import/defeaturing, material/load-case schemas,
 a structured tube shell mesh with quality limits, a versioned CalculiX input-deck
 generator with input-hash provenance, and acceptance thresholds. It should still add
