@@ -372,7 +372,9 @@ function renderCheck(r) {
     box.append(el("ol", { class: "issues" }, issues.map((issue) => {
       const ev = issue.evidence || {};
       const measured = ev.measured_mm !== undefined && ev.measured_mm !== null && ev.required_mm !== undefined && ev.required_mm !== null
-        ? `${fmt(ev.measured_mm, 0)} mm gap, ${fmt(ev.required_mm, 0)} mm required` : null;
+        ? (issue.rule === "buildable" ? `${fmt(ev.measured_mm, 0)} mm available, ${fmt(ev.required_mm, 0)} mm needed`
+          : ev.measured_mm < 0 ? `overlap of ${fmt(-ev.measured_mm, 0)} mm, ${fmt(ev.required_mm, 0)} mm gap required`
+            : `${fmt(ev.measured_mm, 0)} mm gap, ${fmt(ev.required_mm, 0)} mm required`) : null;
       const at = whereText(r, issue.where);
       return el("li", {},
         el("div", { class: "issue-title" }, el("b", {}, issue.title),
@@ -422,7 +424,7 @@ function rerouteItem(r, line) {
   const reasons = [];
   if (!d.assurance_pass) reasons.push(`Fixes the drawn route, which fails (${(d.failure_reasons[0] || "see errors").replace(/\.$/, "")}).`);
   if (why && why.summary) reasons.push(why.summary);
-  if (why && why.limiting && why.limiting.length) {
+  if (why && !why.summary && why.limiting && why.limiting.length) {
     reasons.push(`Limited by ${why.limiting.map((p) => `${p.name} (${fmt(p.distance_mm, 0)} mm, needs ${fmt(p.required_mm, 0)})`).join(", ")}.`);
   }
   const moved = why && why.nozzle_moves_mm ? Math.max(why.nozzle_moves_mm.start || 0, why.nozzle_moves_mm.end || 0) : line.nozzle_shift_mm;
@@ -441,7 +443,7 @@ function rerouteItem(r, line) {
       el("button", { class: "link", type: "button", onclick: () => openBench(r.drawing_id, line) }, "Open in workbench")),
     el("p", { class: "facts" }, facts.join(" · ")),
     reasons.length ? el("p", { class: "why" }, reasons.join(" ")) : null,
-    el("p", { class: "note" }, cautions.join(" ")));
+    why && why.summary ? null : el("p", { class: "note" }, cautions.join(" ")));
 }
 
 function detailFolds(r) {
