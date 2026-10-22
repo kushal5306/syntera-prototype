@@ -116,6 +116,7 @@ class InferredLayout:
     assumptions: list[Assumption] = field(default_factory=list)
     views: list[str] = field(default_factory=list)
     structures: list[str] = field(default_factory=list)  # obstacle names that are structure
+    origin: Point2 | None = None  # drawing coordinates (mm) of the model's x = y = 0
     rationale: list[Rationale] = field(default_factory=list)  # why ``tube`` has its values
 
 
@@ -1002,6 +1003,7 @@ def infer_layout(
         assumptions=assumptions,
         views=views,
         structures=structures,
+        origin=(round(origin[0], 6), round(origin[1], 6)),
         rationale=tube_rationale(
             tube,
             od_source=_source(options.outer_diameter_mm, drawn_od),

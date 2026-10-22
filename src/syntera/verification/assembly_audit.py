@@ -22,7 +22,7 @@ from OCP.Bnd import Bnd_Box
 from OCP.BRepBndLib import BRepBndLib
 from pydantic import BaseModel, ConfigDict
 
-from syntera.geometry.cad import exact_shape_distance
+from syntera.geometry.cad import closest_points, exact_shape_distance
 from syntera.schemas import Point3
 from syntera.verification.measure import TUBE_FACE_TYPES, measure_tube
 
@@ -150,6 +150,10 @@ def _boxes_near(a: cq.BoundBox, b: cq.BoundBox, gap: float) -> bool:
         or a.zmax + gap < b.zmin
         or b.zmax + gap < a.zmin
     )
+
+
+def _midpoint(a: Point3, b: Point3) -> Point3:
+    return _round(tuple((a[i] + b[i]) / 2 for i in range(3)))  # type: ignore[arg-type]
 
 
 def _box_centre(box: cq.BoundBox) -> Point3:
@@ -282,7 +286,7 @@ def audit_assembly(
                     f"{required:.1f} mm required",
                     measured_mm=round(distance, 3),
                     required_mm=round(required, 3),
-                    location=_box_centre(boxes[i] if a.role != "equipment" else boxes[j]),
+                    location=_midpoint(*closest_points(a.shape, b.shape)),
                 )
             )
 

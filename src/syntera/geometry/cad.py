@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 
 import cadquery as cq
@@ -68,13 +69,39 @@ def make_tube(points: list[Point3], tube_radius: float, bend_radius: float) -> c
     return cq.Solid.sweep(profile, [], path, makeSolid=True, isFrenet=True)
 
 
-def exact_shape_distance(left: cq.Shape, right: cq.Shape) -> float:
-    """Compute exact boundary distance using OpenCascade extrema."""
+def box_gap(left: cq.Shape, right: cq.Shape) -> float:
+    """Distance between the shapes' bounding boxes: a lower bound on their true distance."""
+    a, b = left.BoundingBox(), right.BoundingBox()
+    gaps = (
+        max(0.0, b.xmin - a.xmax, a.xmin - b.xmax),
+        max(0.0, b.ymin - a.ymax, a.ymin - b.ymax),
+        max(0.0, b.zmin - a.zmax, a.zmin - b.zmax),
+    )
+    return math.hypot(*gaps)
+
+
+def _extrema(left: cq.Shape, right: cq.Shape) -> BRepExtrema_DistShapeShape:
     calculation = BRepExtrema_DistShapeShape(left.wrapped, right.wrapped)
     calculation.Perform()
     if not calculation.IsDone():
         raise RuntimeError("OpenCascade distance calculation failed")
-    return float(calculation.Value())
+    return calculation
+
+
+def exact_shape_distance(left: cq.Shape, right: cq.Shape) -> float:
+    """Compute exact boundary distance using OpenCascade extrema.
+
+    OpenCascade occasionally reports 0 for swept tubes that are metres apart; the distance
+    can never be below the gap between bounding boxes, so that bound is applied.
+    """
+    return max(float(_extrema(left, right).Value()), box_gap(left, right))
+
+
+def closest_points(left: cq.Shape, right: cq.Shape) -> tuple[Point3, Point3]:
+    """The nearest point on each shape, for locating a clearance finding."""
+    calculation = _extrema(left, right)
+    a, b = calculation.PointOnShape1(1), calculation.PointOnShape2(1)
+    return (a.X(), a.Y(), a.Z()), (b.X(), b.Y(), b.Z())
 
 
 def export_step(shapes: list[cq.Shape], path: Path) -> None:
