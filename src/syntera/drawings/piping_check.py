@@ -26,6 +26,7 @@ from syntera.drawings.models import (
     PipingCheckReport,
     RouteCheck,
 )
+from syntera.drawings.review import OTHER_LINE, plant_check, plant_issues, route_rationale
 from syntera.geometry.cad import (
     assembly_shapes,
     exact_shape_distance,
@@ -57,7 +58,6 @@ CONFIG_FILE = "config.json"
 DRAWN_STEP = "drawn_assembly.step"
 PLANT_STEP = "drawn_plant.step"  # every drawn line, nozzle, equipment item and column
 ASSEMBLY_FILES = {REPORT_FILE: "application/json", PLANT_STEP: "application/step"}
-OTHER_LINE = "drawn line "  # obstacle names for other lines' legs in a line's routing
 NOT_REQUESTED = "not requested: checked as drawn only"
 LINE_FILES = {
     CONFIG_FILE: "application/json",
@@ -362,8 +362,30 @@ def check_drawing(
             report.lines.append(check)
             geometries.append(geometry)
         _totals(report)
-        report.audit = audit_drawn_plant(layout, geometries, report, output / PLANT_STEP)
+        report.audit, parts = audit_drawn_plant(layout, geometries, report, output / PLANT_STEP)
         report.findings.append(f"Whole drawn plant: {report.audit.summary}.")
+        origin = layout.origin or (0.0, 0.0)
+        report.drawing_origin_mm = origin
+        report.issues = plant_issues(report.audit, layout.lines, report.lines, parts, origin)
+        if options.optimise:
+            names = [line.name for line in layout.lines]
+            for index, (line, check, geometry) in enumerate(
+                zip(layout.lines, report.lines, geometries, strict=True)
+            ):
+                plant = (
+                    plant_check(
+                        geometry.optimised_tube,
+                        line.name,
+                        {names[other] for other in partners[index]},
+                        parts,
+                        geometry.config.tube.minimum_clearance,
+                    )
+                    if geometry.optimised_tube is not None
+                    else None
+                )
+                check.route_rationale = route_rationale(
+                    line, check, geometry.config, geometry.optimised_tube, plant
+                )
     (output / REPORT_FILE).write_text(
         json.dumps(report.model_dump(mode="json"), indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
@@ -555,7 +577,7 @@ def audit_drawn_plant(
     geometries: list[LineGeometry],
     report: PipingCheckReport,
     step_path: Path,
-) -> AssemblyAudit:
+) -> tuple[AssemblyAudit, list[AuditPart]]:
     """Audit every drawn pipe, nozzle stub, equipment item and column against each other.
 
     The per-line checks only see equipment; this is where two drawn lines that cross at the
@@ -614,9 +636,10 @@ def audit_drawn_plant(
             )
         )
     export_step([part.shape for part in parts], step_path)
-    return audit_assembly(
+    audit = audit_assembly(
         parts, missing_lines=missing, missing_reason="cannot be built as drawn (see its check)"
     )
+    return audit, parts
 
 
 def _cardinal(a: Point3, b: Point3) -> Point3:

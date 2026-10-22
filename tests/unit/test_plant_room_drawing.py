@@ -111,6 +111,21 @@ def test_drawn_plant_audit_finds_the_seeded_clash(plant_room, tmp_path):
     assert "leg 4 is 50 mm long but its bends need 133 mm" in condensate.drawn.failure_reasons[0]
     for rule in ("connections", "bend_radius", "outside_diameter", "access"):
         assert rules[rule].status == "pass"
+    # one traceable issue per error, located in the drawing's own coordinates
+    assert report.drawing_origin_mm == (-200.0, -200.0)
+    issues = {tuple(issue.parts): issue for issue in report.issues}
+    crossing = issues[("80-P-2003-A1A", "150-P-2010-B1A")]
+    assert crossing.rule == "clash"
+    assert (crossing.where.x, crossing.where.y) == (9600.0, 7600.0)
+    assert crossing.where.el == pytest.approx(4200.0, abs=1.0)
+    assert crossing.evidence.required_mm == 25.0
+    assert "another elevation" in crossing.fix
+    elbow = issues[("80-P-2011-B1A",)]
+    assert elbow.evidence.measured_mm == 50.0
+    assert elbow.evidence.required_mm == pytest.approx(133.35, abs=0.1)
+    assert (elbow.where.x, elbow.where.y) == (13000.0, 3650.0)
+    assert len(report.issues) == 4
+    assert all(line.route_rationale is None for line in report.lines)
     assert all(
         line.optimised.failure_reasons[0].startswith("not requested") for line in report.lines
     )

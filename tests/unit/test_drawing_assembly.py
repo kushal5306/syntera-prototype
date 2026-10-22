@@ -123,6 +123,17 @@ def test_piping_check_finds_the_clash_and_a_verified_shorter_route(plan_layout_d
     assert line.nozzle_shift_mm == 0.0
     assert "clashes with equipment or the skid limits (BAG FILTER)" in report.findings[0]
     assert "3800 mm (40.2%) shorter" in report.findings[1]
+    why = line.route_rationale
+    assert why.drawn.length_mm == line.drawn.length_mm
+    assert why.proposed.score_mm == pytest.approx(
+        line.optimised.length_mm + line.optimised.bends * why.weights["bend_mm"]
+    )
+    assert why.summary.startswith("Syntera's route is 3.8 m shorter")
+    assert why.limiting and why.limiting[0].distance_mm >= why.limiting[0].required_mm
+    assert why.plant_check.passes and why.nozzle_moves_mm == {"start": 0.0, "end": 0.0}
+    clash = report.issues[0]  # the small skid's equipment is also closer than 800 mm access
+    assert clash.rule == "clash" and "BAG FILTER" in clash.parts and clash.where is not None
+    assert {issue.rule for issue in report.issues} == {"clash", "access"}
     folder = tmp_path / report.drawing_id / ASSEMBLY_DIR
     assert (folder / REPORT_FILE).is_file()
     for name in ("drawn_assembly.step", "routed_assembly.step", "config.json", "layout.dxf"):
