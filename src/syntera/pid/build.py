@@ -30,7 +30,10 @@ from syntera.pid.models import (
     Point3,
     RoutingTrial,
 )
+from syntera.pid.rationale import line_rationale, plant_rationale
 from syntera.pipeline import execute_pipeline
+from syntera.rationale import RATIONALE_FILE, Rationale, build_report, grid_rationale
+from syntera.reporting.output import write_json
 from syntera.schemas import (
     BoxObstacle,
     CylinderObstacle,
@@ -231,6 +234,7 @@ def _route_pass(
     step: float,
     order: list[PidConnection],
     output: Path,
+    grid: Rationale,
 ) -> list[RouteGeometry]:
     """Route every connection in ``order``; each routed pipe is an obstacle for the next.
 
@@ -320,7 +324,12 @@ def _route_pass(
                         bend=4 * step, obstacle_proximity=step, port_direction=1000
                     ),
                 )
-                result = execute_pipeline(config, folder, create_preview=False)
+                result = execute_pipeline(
+                    config,
+                    folder,
+                    create_preview=False,
+                    rationale=[*line_rationale(connection.nominal_diameter, outer, step), grid],
+                )
                 (folder / CONFIG_FILE).write_text(
                     json.dumps(config.model_dump(mode="json"), indent=2) + "\n", encoding="utf-8"
                 )
@@ -499,11 +508,12 @@ def build_plant(
     provisional = place(document, 250.0)
     step = voxel_resolution(provisional.workspace, PLANT_MAX_VOXELS)
     layout = provisional if step == 250.0 else place(document, step)
+    grid = grid_rationale(step, provisional.workspace, PLANT_MAX_VOXELS)
     equipment_shapes = [obstacle_shape(item) for item in _equipment_obstacles(layout)]
 
     def run(strategy: str, order: list[PidConnection]) -> _Pass:
         folder = output / f".pass-{strategy}"
-        routes = _route_pass(document, layout, step, order, folder)
+        routes = _route_pass(document, layout, step, order, folder, grid)
         return _Pass(strategy, routes, audit_plant(layout, equipment_shapes, routes), folder)
 
     passes = [run("largest-bore-first", _default_order(document))]
@@ -568,6 +578,12 @@ def build_plant(
             )
             for trial in passes
         ],
+    )
+    write_json(
+        build_report(
+            f"{document.filename} proposed layout", plant_rationale(document, layout, step), [grid]
+        ),
+        output / RATIONALE_FILE,
     )
     (output / REPORT_FILE).write_text(
         json.dumps(report.model_dump(mode="json"), indent=2, sort_keys=True) + "\n",

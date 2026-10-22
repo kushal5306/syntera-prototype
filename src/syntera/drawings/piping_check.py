@@ -34,6 +34,7 @@ from syntera.geometry.cad import (
     obstacle_shape,
 )
 from syntera.pipeline import execute_pipeline
+from syntera.rationale import Rationale, grid_rationale, weights_rationale
 from syntera.reporting.metrics import piping_metrics
 from syntera.schemas import (
     AssuranceReport,
@@ -67,6 +68,7 @@ LINE_FILES = {
     "assurance_report.json": "application/json",
     "metrics.json": "application/json",
     "layout.dxf": "application/dxf",
+    "rationale.json": "application/json",
 }
 VOXEL_STEPS_MM = (5.0, 10.0, 20.0, 25.0, 50.0, 100.0, 200.0, 250.0, 500.0)
 MAX_VOXELS = 64_000
@@ -103,6 +105,22 @@ def voxel_resolution(dimensions: Point3, max_voxels: int = MAX_VOXELS) -> float:
 def _direction(a: Point3, b: Point3) -> Point3:
     length = math.dist(a, b)
     return tuple(round((b[i] - a[i]) / length, 9) for i in range(3))  # type: ignore[return-value]
+
+
+def line_rationale(layout: InferredLayout, line: DrawnLine, resolution: float) -> list[Rationale]:
+    """Why a drawn line's routing run uses its tube, grid and cost values."""
+    assert layout.workspace is not None
+    return [
+        *(line.rationale if line.tube is not None else layout.rationale),
+        grid_rationale(resolution, layout.workspace, MAX_VOXELS),
+        *weights_rationale(
+            4 * resolution,
+            2 * resolution,
+            1000.0,
+            resolution,
+            "drawing.routing_weights_from_grid.v1",
+        ),
+    ]
 
 
 def _config(
@@ -462,7 +480,12 @@ def _check_line(
     drawn, drawn_tube = _check_drawn(line, config_for_drawn, options)
 
     if options.optimise:
-        result = execute_pipeline(optimised_config, folder, create_preview=False)
+        result = execute_pipeline(
+            optimised_config,
+            folder,
+            create_preview=False,
+            rationale=line_rationale(layout, line, resolution),
+        )
         built = result.tube is not None
         routed_shapes, routed_tube = result.assembly, result.tube
         optimised = _route_check(

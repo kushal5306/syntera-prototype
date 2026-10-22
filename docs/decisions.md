@@ -33,3 +33,8 @@
 14. **P&IDs become 3D only as a proposed layout.** P&ID graphics positions are never read
     as plant positions. Equipment is placed and lines routed deterministically, each route
     passes the same exact checks, and the report says the layout is a proposal.
+15. **Rationale is recorded, not guessed.** Every value a run uses carries a record of its
+    source, rule id and inputs, written by the same deterministic code that chose it.
+    Callers that build a configuration (from a P&ID or a drawing) pass their own records,
+    so a rule-chosen value is never reported as the user's. Records explain values and are
+    never evidence for, or inputs to, an assurance verdict.

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import shutil
 import time
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -12,6 +13,13 @@ import cadquery as cq
 from syntera.analysis.calculix import write_fea_inputs
 from syntera.geometry.cad import assembly_shapes, export_step, make_tube
 from syntera.geometry.step_import import import_step_obstacle
+from syntera.rationale import (
+    RATIONALE_FILE,
+    Rationale,
+    RationaleReport,
+    build_report,
+    config_rationale,
+)
 from syntera.reporting.layout_dxf import write_layout_dxf
 from syntera.reporting.metrics import package_metrics
 from syntera.reporting.output import write_json, write_preview
@@ -39,6 +47,7 @@ class PipelineResult:
     tube: cq.Shape | None
     fea: FeaManifest | None = None
     metrics: PackageMetrics | None = None
+    rationale: RationaleReport | None = None
 
 
 def execute_pipeline(
@@ -46,8 +55,14 @@ def execute_pipeline(
     output: Path,
     *,
     create_preview: bool = True,
+    rationale: Iterable[Rationale] = (),
 ) -> PipelineResult:
-    """Route, construct, verify, and persist one configuration."""
+    """Route, construct, verify, and persist one configuration.
+
+    ``rationale`` overrides the records derived from ``config`` at the same paths. Callers
+    that build a configuration themselves (from a P&ID or a drawing) pass the rules and
+    sources they used, so no chosen value is reported as stated by the user.
+    """
     started_at = time.perf_counter()
     output.mkdir(parents=True, exist_ok=True)
     for filename in (
@@ -59,6 +74,7 @@ def execute_pipeline(
         "import_report.json",
         "metrics.json",
         "layout.dxf",
+        RATIONALE_FILE,
     ):
         (output / filename).unlink(missing_ok=True)
     shutil.rmtree(output / "fea", ignore_errors=True)
@@ -66,6 +82,8 @@ def execute_pipeline(
     if step_obstacles:
         summaries = [import_step_obstacle(obstacle).summary for obstacle in step_obstacles]
         write_json(ImportReport(obstacles=summaries), output / "import_report.json")
+    explained = build_report(config.title, config_rationale(config), rationale)
+    write_json(explained, output / RATIONALE_FILE)
     assembly = assembly_shapes(config)
     export_step(assembly, output / "assembly.step")
 
@@ -102,5 +120,11 @@ def execute_pipeline(
     if config.analysis is not None and report.overall_pass:
         fea = write_fea_inputs(config, route.points, output / "fea")
     return PipelineResult(
-        assembly=assembly, route=route, report=report, tube=tube, fea=fea, metrics=metrics
+        assembly=assembly,
+        route=route,
+        report=report,
+        tube=tube,
+        fea=fea,
+        metrics=metrics,
+        rationale=explained,
     )

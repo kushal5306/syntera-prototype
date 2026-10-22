@@ -28,6 +28,7 @@ from syntera.drawings.models import (
     InferredEquipment,
     LayerRole,
 )
+from syntera.rationale import Rationale
 from syntera.schemas import BoxObstacle, CylinderObstacle, Point3, TubeSpecification
 
 Point2 = tuple[float, float]
@@ -100,6 +101,7 @@ class DrawnLine:
     line_number: str | None = None
     ends: tuple[LineEnd, ...] = ()
     problems: tuple[str, ...] = ()  # why the run cannot be built as drawn
+    rationale: tuple[Rationale, ...] = ()  # why ``tube`` has its values
 
 
 @dataclass
@@ -114,6 +116,7 @@ class InferredLayout:
     assumptions: list[Assumption] = field(default_factory=list)
     views: list[str] = field(default_factory=list)
     structures: list[str] = field(default_factory=list)  # obstacle names that are structure
+    rationale: list[Rationale] = field(default_factory=list)  # why ``tube`` has its values
 
 
 @dataclass(frozen=True)
@@ -407,6 +410,66 @@ def _source(user_value: float | None, drawing_value: float | None) -> str:
     return "drawing" if drawing_value is not None else "default"
 
 
+def tube_rationale(
+    tube: TubeSpecification,
+    *,
+    od_source: str,
+    radius_source: str,
+    radius_clamped: bool,
+    clearance_source: str,
+) -> list[Rationale]:
+    """Why the inferred tube has its OD, bend radius and clearance (user, drawing or rule)."""
+    stated = {
+        "user": ("user", None, "as given in the check options."),
+        "drawing": ("drawing", None, "as drawn or annotated on the drawing."),
+    }
+    od = tube.outer_diameter
+    records = []
+    for path, value, source, default_rule, default_text in (
+        (
+            "tube.outer_diameter",
+            od,
+            od_source,
+            None,
+            "not given or drawn; DN50 (60.3 mm OD) is assumed.",
+        ),
+        (
+            "tube.minimum_bend_radius",
+            tube.minimum_bend_radius,
+            radius_source,
+            "drawing.bend_radius_long_radius.v1",
+            "not given or drawn; 1.5 x the {outer_diameter_mm:g} mm OD (long-radius elbow).",
+        ),
+        (
+            "tube.minimum_clearance",
+            tube.minimum_clearance,
+            clearance_source,
+            "drawing.clearance_half_od.v1",
+            "not given or drawn; half the {outer_diameter_mm:g} mm OD.",
+        ),
+    ):
+        kind, rule, text = stated.get(
+            source, ("rule" if default_rule else "default", default_rule, default_text)
+        )
+        if path == "tube.minimum_bend_radius" and radius_clamped:
+            kind, rule = "rule", "drawing.bend_radius_at_least_tube_radius.v1"
+            text = (
+                "raised to the tube radius, the smallest bend a {outer_diameter_mm:g} mm OD allows."
+            )
+        records.append(
+            Rationale(
+                path=path,
+                value=value,
+                unit="mm",
+                source=kind,  # type: ignore[arg-type]
+                rule_id=rule,
+                inputs={"outer_diameter_mm": od},
+                explanation="{value} {unit}: " + text,
+            )
+        )
+    return records
+
+
 def infer_layout(
     doc: Drawing, mm_per_unit: float | None, options: AssemblyOptions
 ) -> InferredLayout:
@@ -499,8 +562,8 @@ def infer_layout(
         if i.role in {"pipe", "pipe_centreline"} and i.entity.dxftype() == "ARC"
     )
     drawn_radius = _text_value(texts, "bend_radius") or (arc_radii[0] if arc_radii else None)
-    radius = options.bend_radius_mm or drawn_radius or 1.5 * od
-    radius = max(radius, od / 2)
+    chosen_radius = options.bend_radius_mm or drawn_radius or 1.5 * od
+    radius = max(chosen_radius, od / 2)
     drawn_clearance = _text_value(texts, "clearance")
     clearance = (
         options.clearance_mm
@@ -730,6 +793,7 @@ def infer_layout(
         fallback, fallback_source = DEFAULT_PIPE_ELEVATION_MM, "default"
 
     specs: list[tuple[str | None, TubeSpecification]] = []
+    why: list[tuple[Rationale, ...]] = []
     paths: list[list[Point3]] = []
     labelled_levels = 0
     for index, corners in enumerate(plans):
@@ -740,7 +804,8 @@ def infer_layout(
             or drawn_od
             or DEFAULT_OUTER_DIAMETER_MM
         )
-        line_radius = max(options.bend_radius_mm or drawn_radius or 1.5 * line_od, line_od / 2)
+        chosen_line_radius = options.bend_radius_mm or drawn_radius or 1.5 * line_od
+        line_radius = max(chosen_line_radius, line_od / 2)
         line_clearance = (
             options.clearance_mm
             if options.clearance_mm is not None
@@ -754,6 +819,20 @@ def infer_layout(
             minimum_clearance=line_clearance,
         )
         specs.append((number.text if number else None, spec))
+        why.append(
+            tuple(
+                tube_rationale(
+                    spec,
+                    od_source=_source(
+                        options.outer_diameter_mm,
+                        (number.outer_diameter_mm if number else None) or drawn_od,
+                    ),
+                    radius_source=_source(options.bend_radius_mm, drawn_radius),
+                    radius_clamped=line_radius != chosen_line_radius,
+                    clearance_source=_source(options.clearance_mm, drawn_clearance),
+                )
+            )
+        )
         heights: list[float | None] = []
         for segment in range(len(corners) - 1):
             found = levels.get((index, segment))
@@ -793,6 +872,7 @@ def infer_layout(
                 line_number=number,
                 ends=tuple(ends),
                 problems=tuple(problems),
+                rationale=why[index],
             )
         )
     named = [line.line_number for line in lines if line.line_number]
@@ -922,6 +1002,13 @@ def infer_layout(
         assumptions=assumptions,
         views=views,
         structures=structures,
+        rationale=tube_rationale(
+            tube,
+            od_source=_source(options.outer_diameter_mm, drawn_od),
+            radius_source=_source(options.bend_radius_mm, drawn_radius),
+            radius_clamped=radius != chosen_radius,
+            clearance_source=_source(options.clearance_mm, drawn_clearance),
+        ),
     )
 
 
