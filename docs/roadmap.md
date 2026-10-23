@@ -27,7 +27,7 @@ Status values: `todo`, `in-review` (PR open), `done` (merged), `blocked` (reason
 | # | ID | Milestone | Layer | Depends on | Status | PR |
 |---|----|-----------|-------|------------|--------|----|
 | 1 | A1 | Rationale schema | Design model | - | done | [#19](https://github.com/kushal5306/syntera-prototype/pull/19) |
-| 2a | A2a | Deterministic engineering rule library: rules, tables, config sizing | Design model | A1 | in-review | PR_LINK |
+| 2a | A2a | Deterministic engineering rule library: rules, tables, config sizing | Design model | A1 | in-review | [#22](https://github.com/kushal5306/syntera-prototype/pull/22) |
 | 2b | A2b | Demo, compare and web runs size a line from flow | Design model | A2a | todo | |
 | 3 | A3 | Canonical design document | Design model | A1 | todo | |
 | 4 | B1 | Multi-line design from the design document | 3D engine | A3 | todo | |
