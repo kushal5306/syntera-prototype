@@ -140,6 +140,9 @@ _UNITS_BY_SUFFIX = (
     ("_mm", "mm"),
     ("_per_k", "1/K"),
     ("_tonne_per_mm3", "t/mm3"),
+    ("_m3_per_h", "m3/h"),
+    ("_m_per_s", "m/s"),
+    ("_temperature_c", "degC"),
 )
 _DESCRIPTIONS: dict[str, str] = {
     "tube.outer_diameter": "pipe outside diameter",
