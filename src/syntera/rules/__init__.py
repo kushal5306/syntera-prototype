@@ -6,7 +6,13 @@ values only; they never set, relax or override an assurance verdict. Their table
 synthetic demonstration data (see ``syntera.rules.tables``) and are not code-certified.
 """
 
-from syntera.rules.line import LineSizing, LineSizingSpec, size_line, sized_config
+from syntera.rules.line import (
+    LineSizing,
+    LineSizingSpec,
+    size_line,
+    sized_config,
+    sizing_still_applies,
+)
 from syntera.rules.sizing import RULE_LIBRARY_VERSION, RULES, RuleError, RuleResult
 
 __all__ = [
@@ -18,4 +24,5 @@ __all__ = [
     "RuleResult",
     "size_line",
     "sized_config",
+    "sizing_still_applies",
 ]
