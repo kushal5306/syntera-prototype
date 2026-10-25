@@ -104,6 +104,17 @@ In the web app, sizing records apply only while the tube, wall, material and saf
 posted from the browser still equal the sized values; once one is edited, the posted values
 are recorded as the user's. The rule tables are synthetic and not code-certified.
 
+A configuration converts into a canonical design document, `design.json`: equipment,
+nozzles, lines (tube, duty and analysis), routing parameters, the rationale for every
+chosen value (paths under `parameters.` or `lines.<line id>.`) and SHA-256 hashes of the
+YAML and STEP inputs. The JSON is canonical, so identical input gives byte-identical
+files, and a run derived from the document writes the same `route.json` and
+`rationale.json` as a run from the YAML. The document never holds an assurance verdict.
+
+```bash
+python -m syntera.cli design --config examples/demo_skid_sized.yaml --output outputs/design
+```
+
 `layout.dxf` is a general-arrangement drawing in millimetres: plan, front elevation and
 right elevation (third-angle) of the equipment, the nozzles and the routed tube drawn
 along its exact tangent/arc centreline at its outer diameter, with overall dimensions

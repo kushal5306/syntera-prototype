@@ -29,11 +29,12 @@ Status values: `todo`, `in-review` (PR open), `done` (merged), `blocked` (reason
 | 1 | A1 | Rationale schema | Design model | - | done | [#19](https://github.com/kushal5306/syntera-prototype/pull/19) |
 | 2a | A2a | Deterministic engineering rule library: rules, tables, config sizing | Design model | A1 | in-review | [#22](https://github.com/kushal5306/syntera-prototype/pull/22) |
 | 2b | A2b | Demo, compare and web runs size a line from flow | Design model | A2a | in-review | [#23](https://github.com/kushal5306/syntera-prototype/pull/23) |
-| 3 | A3 | Canonical design document | Design model | A1 | todo | |
-| 4 | B1 | Multi-line design from the design document | 3D engine | A3 | todo | |
-| 5 | A4 | Change sets and design diff | Design model | A3 | todo | |
+| 3a | A3a | Canonical design document: schema, conversion, persistence, migration | Design model | A1 | in-review | [#24](https://github.com/kushal5306/syntera-prototype/pull/24) |
+| 3b | A3b | CLI and web runs derive all outputs from the design document | Design model | A3a | todo | |
+| 4 | B1 | Multi-line design from the design document | 3D engine | A3a | todo | |
+| 5 | A4 | Change sets and design diff | Design model | A3a | todo | |
 | 6 | D1 | DWG export through external converter | DWG I/O | - | todo | |
-| 7 | C1 | Hidden-line projection from exact B-rep | 2D drawings | A3 | todo | |
+| 7 | C1 | Hidden-line projection from exact B-rep | 2D drawings | A3a | todo | |
 | 8 | C2 | Drawing sheets, title block, auto dimensions | 2D drawings | C1 | todo | |
 | 9 | C4 | Drawing-to-model traceability | 2D drawings | C2 | todo | |
 | 10 | D2 | Richer drawing reading | DWG I/O | - | todo | |
@@ -99,6 +100,17 @@ routes, parameters, rationale and input hashes. Load, validate and save; CLI and
 derive all outputs from it. Existing YAML configs convert into it.
 *Done when:* demo, compare and FEA run from a design document with byte-identical outputs
 for identical input, and a schema version migration test exists.
+
+Split into two parts:
+
+- **A3a** `syntera.design`: versioned `DesignDocument` (equipment, nozzles, lines with
+  tube, duty and analysis, parameters, routes, rationale under `parameters.` and
+  `lines.<id>.`, input hashes), conversion from YAML (fixed OD or `line_sizing`),
+  per-line run configuration and rationale, canonical save/load, content hash, a
+  migration registry with tests, and `syntera design` to write `design.json`.
+- **A3b** `demo`, `compare`, `fea-evaluate` and the web app accept and write a design
+  document and derive every output from it; integration test of byte-identical outputs
+  for demo, compare and FEA decks from identical design input.
 
 **A4 Change sets and design diff.** Typed `ChangeSet` edits (set parameter, move
 equipment, add or remove line) applied to a design, followed by regeneration and a diff

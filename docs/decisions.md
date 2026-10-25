@@ -45,3 +45,10 @@
     the hoop-stress minimum, two sources for one size) is refused, never overridden. Rule
     tables are synthetic until licensed data is supplied, and acceptance still comes only
     from the exact checks and FEA thresholds.
+17. **The design document is the source of truth.** `design.json` is versioned, validated
+    on load and written as canonical JSON, so identical input gives identical bytes and
+    a content hash identifies a design. Run configurations are derived from it per line;
+    rationale paths are namespaced (`parameters.`, `lines.<id>.`) so several lines can
+    share one document. Older documents are upgraded by explicit one-step migrations and
+    a newer or unmigratable version is refused. The document holds design values and
+    their rationale only, never an assurance verdict.
