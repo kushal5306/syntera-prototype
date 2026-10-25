@@ -59,6 +59,19 @@ def run_fea_evaluate(config_path: Path, output: Path) -> int:
     return 0 if report.overall_pass else 2
 
 
+def run_design(config_path: Path, output: Path) -> int:
+    """Convert a YAML run configuration into a canonical design document."""
+    from syntera.design import DESIGN_FILE, design_from_yaml, design_sha256, save_design
+
+    design = design_from_yaml(config_path)
+    target = save_design(design, output / DESIGN_FILE)
+    lines = ", ".join(line.id for line in design.lines)
+    print(f"Design: {target} (schema version {design.schema_version})")
+    print(f"Equipment: {len(design.equipment)}; lines: {lines}")
+    print(f"Rationale records: {len(design.rationale)}; sha256: {design_sha256(design)}")
+    return 0
+
+
 def run_drawing(source: Path, output: Path) -> int:
     """Convert (if DWG), read and render one drawing into ``output/<drawing_id>``."""
     from syntera.drawings.intake import SUMMARY_FILE, ingest_drawing
@@ -242,6 +255,11 @@ def build_parser() -> argparse.ArgumentParser:
     evaluate.add_argument("--config", type=Path, required=True)
     evaluate.add_argument("--output", type=Path, required=True)
     _add_time_log(evaluate)
+    design = subparsers.add_parser(
+        "design", help="convert a YAML configuration into a canonical design.json"
+    )
+    design.add_argument("--config", type=Path, required=True)
+    design.add_argument("--output", type=Path, required=True)
     drawing = subparsers.add_parser(
         "drawing", help="convert a DWG/DXF drawing to DXF, an SVG view and a JSON summary"
     )
@@ -321,6 +339,8 @@ def main(argv: list[str] | None = None) -> int:
             return run_time(args.action, args.log, args.task, args.phase, args.note)
         if args.command == "kpi1":
             return run_kpi1(args.log, args.baseline, args.output)
+        if args.command == "design":
+            return run_design(args.config, args.output)
         if args.command == "drawing":
             return run_drawing(args.input, args.output)
         if args.command == "audit-step":
