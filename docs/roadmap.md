@@ -34,7 +34,7 @@ Status values: `todo`, `in-review` (PR open), `done` (merged), `blocked` (reason
 | 4 | B1 | Multi-line design from the design document | 3D engine | A3a | done | [#27](https://github.com/kushal5306/syntera-prototype/pull/27) |
 | 5 | A4 | Change sets and design diff | Design model | A3a | done | [#28](https://github.com/kushal5306/syntera-prototype/pull/28) |
 | 6 | D1 | DWG export through external converter | DWG I/O | - | done | [#29](https://github.com/kushal5306/syntera-prototype/pull/29) |
-| 7 | C1 | Hidden-line projection from exact B-rep | 2D drawings | A3a | todo | |
+| 7 | C1 | Hidden-line projection from exact B-rep | 2D drawings | A3a | done | [#30](https://github.com/kushal5306/syntera-prototype/pull/30) |
 | 8 | C2 | Drawing sheets, title block, auto dimensions | 2D drawings | C1 | todo | |
 | 9 | C4 | Drawing-to-model traceability | 2D drawings | C2 | todo | |
 | 10 | D2 | Richer drawing reading | DWG I/O | - | todo | |
