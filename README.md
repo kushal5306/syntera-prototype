@@ -162,6 +162,16 @@ and the DWG; `/api/drawings/capabilities` reports `dwg_export`.
 python -m syntera.cli export-dwg --input outputs/demo/layout.dxf --output outputs/demo/layout.dwg
 ```
 
+`project` makes exact hidden-line views of any STEP assembly with OpenCascade's
+`HLRBRep`: plan, front, right and isometric. Visible and hidden edges are discretised,
+rounded and sorted (identical geometry gives a byte-identical `projection.json`), tagged
+with the solid they came from, and written to `views.dxf` with visible edges on
+`HLR-VISIBLE` and hidden edges on the dashed `HLR-HIDDEN` layer.
+
+```bash
+python -m syntera.cli project --step outputs/demo/routed_assembly.step --output outputs/views
+```
+
 `layout.dxf` is a general-arrangement drawing in millimetres: plan, front elevation and
 right elevation (third-angle) of the equipment, the nozzles and the routed tube drawn
 along its exact tangent/arc centreline at its outer diameter, with overall dimensions

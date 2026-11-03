@@ -164,6 +164,27 @@ def run_export_dwg(source: Path, target: Path, release: str) -> int:
     return 0
 
 
+def run_project(step: Path, output: Path) -> int:
+    """Hidden-line projection of a STEP assembly into plan, front, right and iso views."""
+    from syntera.drawings.projection import (
+        PROJECTION_FILE,
+        VIEWS_DXF,
+        project_shapes,
+        step_solids,
+        write_projection_dxf,
+    )
+
+    projection = project_shapes(step_solids(step))
+    output.mkdir(parents=True, exist_ok=True)
+    write_json(projection, output / PROJECTION_FILE)
+    write_projection_dxf(projection, output / VIEWS_DXF)
+    print(f"Projected {len(projection.sources)} solid(s) from {step.name}")
+    for view in projection.views:
+        print(f"- {view.name}: {view.count(True)} visible, {view.count(False)} hidden polylines")
+    print(f"Views: {output / VIEWS_DXF}; data: {output / PROJECTION_FILE}")
+    return 0
+
+
 def run_drawing(source: Path, output: Path) -> int:
     """Convert (if DWG), read and render one drawing into ``output/<drawing_id>``."""
     from syntera.drawings.intake import SUMMARY_FILE, ingest_drawing
@@ -382,6 +403,11 @@ def build_parser() -> argparse.ArgumentParser:
     export.add_argument("--input", type=Path, required=True)
     export.add_argument("--output", type=Path, required=True)
     export.add_argument("--release", default="ACAD2018", help="ODA output version name")
+    projecting = subparsers.add_parser(
+        "project", help="hidden-line projection of a STEP assembly into a views DXF"
+    )
+    projecting.add_argument("--step", type=Path, required=True)
+    projecting.add_argument("--output", type=Path, required=True)
     drawing = subparsers.add_parser(
         "drawing", help="convert a DWG/DXF drawing to DXF, an SVG view and a JSON summary"
     )
@@ -472,6 +498,8 @@ def main(argv: list[str] | None = None) -> int:
             return run_change(args.design, args.changes, args.output, args.regenerate)
         if args.command == "export-dwg":
             return run_export_dwg(args.input, args.output, args.release)
+        if args.command == "project":
+            return run_project(args.step, args.output)
         if args.command == "drawing":
             return run_drawing(args.input, args.output)
         if args.command == "audit-step":
