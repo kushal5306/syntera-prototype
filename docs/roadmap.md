@@ -60,7 +60,7 @@ Status values: `todo`, `in-review` (PR open), `done` (merged), `blocked` (reason
 | 30 | H3 | Optimisation report and view | Optimisation | H2 | done | [#52](https://github.com/kushal5306/syntera-prototype/pull/52) |
 | 31 | I1 | Background jobs | Platform | - | done | [#53](https://github.com/kushal5306/syntera-prototype/pull/53) |
 | 32 | I2 | Content-addressed run cache and storage interface | Platform | I1 | done | [#54](https://github.com/kushal5306/syntera-prototype/pull/54) |
-| 33 | I3 | API versioning and contract tests | Platform | I1 | todo | |
+| 33 | I3 | API versioning and contract tests | Platform | I1 | done | [#55](https://github.com/kushal5306/syntera-prototype/pull/55) |
 
 ## Milestones
 

@@ -48,6 +48,7 @@ from syntera.web.mesh import scene_meshes
 from syntera.web.optimise import optimise_router
 from syntera.web.pid import pid_router
 from syntera.web.sheets import sheets_router
+from syntera.web.versioning import add_versioned_routes
 
 DOWNLOADS = {
     "assembly.step",
@@ -264,4 +265,5 @@ def create_app(
             raise HTTPException(status_code=404, detail="output has not been generated")
         return FileResponse(target, filename=filename)
 
+    add_versioned_routes(app)
     return app

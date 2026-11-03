@@ -374,6 +374,15 @@ behind the same interface). A restored run is byte-identical to a fresh one, and
 damaged bundle is ignored and recomputed. The optimiser (`optimise --cache DIR`), the
 web optimisation study and `route-design` jobs use the cache.
 
+### API versions
+
+Every API route is served at `/api/v1/...`, the documented contract: `/openapi.json`
+lists only versioned paths, and every API response carries `X-Syntera-API-Version: v1`.
+The unversioned `/api/...` paths remain as aliases for the bundled pages.
+`tests/contracts/api_v1.json` snapshots every v1 endpoint and the fields of every JSON
+request body, and a contract test compares the live OpenAPI schema with it. Changing the
+snapshot is a deliberate API change; a breaking change needs `/api/v2`.
+
 `layout.dxf` is a general-arrangement drawing in millimetres: plan, front elevation and
 right elevation (third-angle) of the equipment, the nozzles and the routed tube drawn
 along its exact tangent/arc centreline at its outer diameter, with overall dimensions
