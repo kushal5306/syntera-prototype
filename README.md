@@ -91,6 +91,19 @@ P&ID or a drawing record the sizing, clearance, grid and cost rules they applied
 P&ID plant folder adds equipment sizes, positions and the skid envelope. Records explain
 values only; they never carry or change an assurance verdict.
 
+A configuration may state a line's duty instead of a fixed outside diameter. With a
+`line_sizing` block (medium, flow, design pressure and temperature), `demo`,
+`fea-evaluate` and `web` size the line with `syntera.rules` and record the chosen OD, bend
+radius and any wall or material the input did not state as `rule` values:
+
+```bash
+python -m syntera.cli demo --config examples/demo_skid_sized.yaml --output outputs/sized
+```
+
+In the web app, sizing records apply only while the tube, wall, material and safety factor
+posted from the browser still equal the sized values; once one is edited, the posted values
+are recorded as the user's. The rule tables are synthetic and not code-certified.
+
 `layout.dxf` is a general-arrangement drawing in millimetres: plan, front elevation and
 right elevation (third-angle) of the equipment, the nozzles and the routed tube drawn
 along its exact tangent/arc centreline at its outer diameter, with overall dimensions

@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field
 from syntera.analysis.calculix import input_sha256
 from syntera.analysis.fields import parse_case_fields, parse_mesh_inp, solve_decks
 from syntera.analysis.results import evaluate_acceptance
-from syntera.config import load_config
+from syntera.config import load_config, load_sized_config
 from syntera.geometry.cad import assembly_shapes
 from syntera.geometry.step_import import StepImportError
 from syntera.pipeline import PipelineResult, execute_pipeline
@@ -28,6 +28,7 @@ from syntera.reporting.timelog import (
     read_log,
     task_hours,
 )
+from syntera.rules import sizing_still_applies
 from syntera.schemas import DemoConfig, Label, StepObstacle, TimeActor
 from syntera.web.audit import audit_router
 from syntera.web.drawings import drawings_router
@@ -166,7 +167,10 @@ def create_app(
             if task:
                 log_time(task, "generate", "start", actor="syntera")
             try:
-                result = execute_pipeline(checked(config), output)
+                sized, sizing = load_sized_config(config_path)
+                if not sizing_still_applies(sized, config):
+                    sizing = []  # edited in the browser: the edited values are the user's
+                result = execute_pipeline(checked(config), output, rationale=sizing)
             except StepImportError as error:
                 raise HTTPException(status_code=422, detail=str(error)) from error
             finally:

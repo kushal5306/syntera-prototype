@@ -12,7 +12,7 @@ from pydantic import ValidationError
 
 from syntera.analysis.calculix import MANIFEST_FILE, input_sha256
 from syntera.analysis.results import evaluate_acceptance
-from syntera.config import load_config
+from syntera.config import load_config, load_sized_config
 from syntera.pipeline import execute_pipeline
 from syntera.reporting.output import write_json
 from syntera.schemas import FeaManifest, RouteResult
@@ -21,13 +21,16 @@ ComputeStep = Callable[[], int]
 
 
 def run_demo(config_path: Path, output: Path) -> int:
-    config = load_config(config_path)
-    result = execute_pipeline(config, output)
+    config, sizing = load_sized_config(config_path)
+    result = execute_pipeline(config, output, rationale=sizing)
     report = result.report
 
     print(f"Route found: {report.route_found}")
     print(f"Overall assurance: {'PASS' if report.overall_pass else 'FAIL'}")
     print(f"Report: {output / 'assurance_report.json'}")
+    if sizing and result.rationale is not None:
+        od = result.rationale.get("tube.outer_diameter")
+        print(f"Line sized by rules: OD {od.value:g} mm ({od.rule_id})")
     if report.failure_reasons:
         print("Reasons: " + "; ".join(report.failure_reasons))
     if result.fea is not None:

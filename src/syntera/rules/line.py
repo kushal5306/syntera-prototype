@@ -178,6 +178,26 @@ def sized_config(raw: dict[str, Any]) -> tuple[DemoConfig, list[Rationale]]:
     return config, [*model_rationale(spec, LINE_SIZING_KEY), *keep]
 
 
+def sizing_still_applies(sized: DemoConfig, config: DemoConfig) -> bool:
+    """Whether ``config`` still carries every value sizing chose or depended on.
+
+    A client that edits a sized configuration (the web app posts the configuration back)
+    may change the tube, wall, material or safety factor. The sizing records explain the
+    values in ``sized`` only, so they apply to ``config`` only while those values are
+    unchanged; otherwise the edited values are the user's and must be reported as such.
+    """
+    if sized.tube != config.tube:
+        return False
+    before, after = sized.analysis, config.analysis
+    if before is None or after is None:
+        return before is after
+    return (
+        before.wall_thickness == after.wall_thickness
+        and before.material == after.material
+        and before.acceptance.stress_safety_factor == after.acceptance.stress_safety_factor
+    )
+
+
 def _material_records(material: Material, chosen: Rationale) -> list[Rationale]:
     """``rule`` records for every property of a material taken from the material table."""
     records = [chosen.model_copy(update={"path": "analysis.material.name"})]
