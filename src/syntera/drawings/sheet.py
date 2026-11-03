@@ -32,15 +32,18 @@ from syntera.drawings.projection import (
     Projection,
     Vector3,
     project_shapes,
-    step_solids,
     view_offsets,
 )
+from syntera.drawings.trace import APPID, design_shapes, tag
 from syntera.rationale import Rationale
 from syntera.reporting.output import write_json
 
 SHEET_FILE = "sheet.json"
 SHEET_DXF = "sheet.dxf"
 SHEET_RULE = "drawing.sheet_and_scale.v1"
+FRAME_REF = "drawing:frame"
+TITLE_REF = "drawing:title-block"
+NOTE_REF = "drawing:note"
 # ISO 216 A-series, landscape (width, height) in mm, smallest first.
 SHEET_SIZES: dict[str, tuple[float, float]] = {
     "A4": (297.0, 210.0),
@@ -98,6 +101,7 @@ class SheetDimension(StrictModel):
     view: str
     kind: Literal["overall", "nozzle", "run"]
     label: str
+    ref: str
     model_length_mm: float
     start: Point2
     end: Point2
@@ -269,12 +273,12 @@ def _dimensions(
             continue
         (x0, y0), (x1, y1) = view.bounds
         dims.append(
-            SheetDimension(view=name, kind="overall", label=f"{name} width",
+            SheetDimension(view=name, kind="overall", label=f"{name} width", ref=f"view:{name}",
                            model_length_mm=round(x1 - x0, 3),
                            start=paper(view, (x0, y0)), end=paper(view, (x1, y0)), angle=0.0)
         )  # fmt: skip
         dims.append(
-            SheetDimension(view=name, kind="overall", label=f"{name} height",
+            SheetDimension(view=name, kind="overall", label=f"{name} height", ref=f"view:{name}",
                            model_length_mm=round(y1 - y0, 3),
                            start=paper(view, (x0, y0)), end=paper(view, (x0, y1)), angle=90.0)
         )  # fmt: skip
@@ -291,6 +295,7 @@ def _dimensions(
             dims.append(
                 SheetDimension(
                     view="plan", kind="nozzle", label=f"nozzle {nozzle.id} {'xy'[axis]}",
+                    ref=f"nozzle:{nozzle.id}",
                     model_length_mm=round(abs(length), 3),
                     start=paper(plan, (0.0, 0.0)),
                     end=paper(plan, end), angle=angle,
@@ -309,6 +314,7 @@ def _dimensions(
             dims.append(
                 SheetDimension(
                     view="plan", kind="run", label=f"line {route.line} run {index}",
+                    ref=f"line:{route.line}",
                     model_length_mm=round(length, 3), start=paper(plan, a), end=paper(plan, b),
                     angle=angle,
                 )
@@ -378,39 +384,43 @@ def layout_sheet(projection: Projection, sheet: SheetInput) -> SheetLayout:
 # ---- DXF --------------------------------------------------------------------------------
 
 
-def _rectangle(space: Modelspace, low: Point2, high: Point2, layer: str) -> None:
-    space.add_lwpolyline(
+def _rectangle(space: Modelspace, low: Point2, high: Point2, layer: str, ref: str) -> None:
+    entity = space.add_lwpolyline(
         [low, (high[0], low[1]), high, (low[0], high[1])],
         close=True,
         dxfattribs={"layer": layer},
     )
+    tag(entity, ref)
 
 
-def _text(space: Modelspace, text: str, at: Point2, height: float, layer: str) -> None:
-    space.add_text(text, height=height, dxfattribs={"layer": layer}).set_placement(
-        at, align=TextEntityAlignment.LEFT
-    )
+def _text(space: Modelspace, text: str, at: Point2, height: float, layer: str, ref: str) -> None:
+    entity = space.add_text(text, height=height, dxfattribs={"layer": layer})
+    entity.set_placement(at, align=TextEntityAlignment.LEFT)
+    tag(entity, ref)
 
 
 def _title_block(space: Modelspace, layout: SheetLayout) -> None:
     width = layout.choice.width_mm
     right, bottom = width - MARGIN_MM, MARGIN_MM
     left, top = right - TITLE_BLOCK[0], bottom + TITLE_BLOCK[1]
-    _rectangle(space, (left, bottom), (right, top), "TITLE")
+    _rectangle(space, (left, bottom), (right, top), "TITLE", TITLE_REF)
     rows = list(layout.title_block.items())
     row_height = TITLE_BLOCK[1] / len(rows)
     for index, (key, value) in enumerate(rows):
         y = top - (index + 1) * row_height
         if index:
-            space.add_line((left, y + row_height), (right, y + row_height),
-                           dxfattribs={"layer": "TITLE"})  # fmt: skip
+            rule = space.add_line((left, y + row_height), (right, y + row_height),
+                                  dxfattribs={"layer": "TITLE"})  # fmt: skip
+            tag(rule, TITLE_REF)
         _text(space, f"{key}: {value}", (left + 2, y + row_height * 0.25),
-              min(TEXT_MM * 0.8, row_height * 0.6), "TITLE")  # fmt: skip
+              min(TEXT_MM * 0.8, row_height * 0.6), "TITLE", TITLE_REF)  # fmt: skip
 
 
 def write_sheet_dxf(projection: Projection, layout: SheetLayout, path: Path) -> Path:
     doc = ezdxf.new("R2018", setup=True)
     doc.units = units.MM
+    if APPID not in doc.appids:
+        doc.appids.new(APPID)
     for name, colour in LAYERS.items():
         doc.layers.add(name, color=colour)
     doc.layers.add(LAYER_VISIBLE, color=7)
@@ -425,35 +435,38 @@ def write_sheet_dxf(projection: Projection, layout: SheetLayout, path: Path) -> 
     space = doc.modelspace()
     choice = layout.choice
     width, height = choice.width_mm, choice.height_mm
-    _rectangle(space, (0.0, 0.0), (width, height), "FRAME")
+    _rectangle(space, (0.0, 0.0), (width, height), "FRAME", FRAME_REF)
     _rectangle(space, (BINDING_MARGIN_MM, MARGIN_MM), (width - MARGIN_MM, height - MARGIN_MM),
-               "FRAME")  # fmt: skip
+               "FRAME", FRAME_REF)  # fmt: skip
     factor = choice.factor
     for view in projection.views:
         ox, oy = layout.view_origins[view.name]
         for polyline in view.polylines:
             layer = LAYER_VISIBLE if polyline.visible else LAYER_HIDDEN
-            space.add_lwpolyline(
+            entity = space.add_lwpolyline(
                 [(ox + x * factor, oy + y * factor) for x, y in polyline.points],
                 dxfattribs={"layer": layer},
             )
+            tag(entity, polyline.source)
         if view.bounds is not None:
             (x0, y0), _ = view.bounds
             _text(space, view.name.upper(), (ox + x0 * factor, oy + y0 * factor - 14),
-                  TEXT_MM, LAYER_LABEL)  # fmt: skip
+                  TEXT_MM, LAYER_LABEL, f"view:{view.name}")  # fmt: skip
     for dim in layout.dimensions:
         offset = 8.0 if dim.kind == "overall" else 5.0
         if dim.angle == 0.0:
             base = ((dim.start[0] + dim.end[0]) / 2, min(dim.start[1], dim.end[1]) - offset)
         else:
             base = (min(dim.start[0], dim.end[0]) - offset, (dim.start[1] + dim.end[1]) / 2)
-        space.add_linear_dim(
+        rendered = space.add_linear_dim(
             base=base, p1=dim.start, p2=dim.end, angle=dim.angle, dimstyle="EZDXF",
             override={"dimlfac": 1 / factor}, dxfattribs={"layer": "DIMENSION"},
-        ).render()  # fmt: skip
+        )  # fmt: skip
+        rendered.render()
+        tag(rendered.dimension, dim.ref)
     _title_block(space, layout)
     _text(space, "Dimensions in mm; run lengths are centreline corner to corner.",
-          (BINDING_MARGIN_MM + 2, MARGIN_MM + 2), TEXT_MM * 0.7, "NOTE")  # fmt: skip
+          (BINDING_MARGIN_MM + 2, MARGIN_MM + 2), TEXT_MM * 0.7, "NOTE", NOTE_REF)  # fmt: skip
     path.parent.mkdir(parents=True, exist_ok=True)
     doc.saveas(path)
     return path
@@ -474,7 +487,7 @@ def sheet_from_run(run: Path, output: Path, drawing_number: str | None = None) -
     found = [(step, report) for step, report in RUN_SOURCES if (run / step).is_file()]
     if not found:
         raise ValueError(f"{run}: no routed_assembly.step or routed_design.step to draw")
-    step_name, report_name = found[0]
+    report_name = found[0][1]
     verdict = None
     if (run / report_name).is_file():
         verdict = bool(json.loads((run / report_name).read_text("utf-8"))["overall_pass"])
@@ -489,7 +502,8 @@ def sheet_from_run(run: Path, output: Path, drawing_number: str | None = None) -
         nozzles=[SheetLabel(id=n.id, position=n.port.position) for n in design.nozzles],
         routes=[SheetRoute(line=r.line, points=r.points) for r in design.routes],
     )
-    projection = project_shapes(step_solids(run / step_name))
+    # Project the design's own exact shapes, so every edge names its design item (C4).
+    projection = project_shapes(design_shapes(design))
     layout = layout_sheet(projection, sheet)
     output.mkdir(parents=True, exist_ok=True)
     write_json(projection, output / PROJECTION_FILE)

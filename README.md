@@ -181,6 +181,13 @@ than 1:10, at the largest such scale (rule `drawing.sheet_and_scale.v1`). The ti
 repeats the verdict from the run's report and states that the sheet is a review drawing,
 not evidence.
 
+Every entity on a sheet carries XDATA (application `SYNTERA`) naming what it shows:
+`equipment:<id>`, `nozzle:<id>` or `line:<id>` from the design document, `view:<name>`
+for overall dimensions and view labels, or `drawing:<part>` for the frame, title block
+and notes. The views are projected from the design's own exact shapes, so a selected
+edge or dimension resolves to its line, nozzle or equipment
+(`syntera.drawings.trace.resolve`, `trace_dxf`).
+
 ```bash
 python -m syntera.cli sheet --run outputs/demo --output outputs/sheet
 ```
