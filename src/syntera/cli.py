@@ -185,6 +185,20 @@ def run_project(step: Path, output: Path) -> int:
     return 0
 
 
+def run_sheet(run: Path, output: Path, number: str | None) -> int:
+    """ISO drawing sheet (frame, title block, scale, views, dimensions) for a run folder."""
+    from syntera.drawings.sheet import SHEET_DXF, SHEET_FILE, sheet_from_run
+
+    layout = sheet_from_run(run, output, number)
+    choice = layout.choice
+    print(f"Sheet: ISO {choice.sheet} at {choice.label} ({layout.drawing_number})")
+    print(f"Dimensions: {len(layout.dimensions)}")
+    verdict = layout.title_block["ASSURANCE (EXACT GEOMETRY CHECKS)"]
+    print(f"Title block assurance (repeated from the report): {verdict}")
+    print(f"Sheet: {output / SHEET_DXF}; layout: {output / SHEET_FILE}")
+    return 0
+
+
 def run_drawing(source: Path, output: Path) -> int:
     """Convert (if DWG), read and render one drawing into ``output/<drawing_id>``."""
     from syntera.drawings.intake import SUMMARY_FILE, ingest_drawing
@@ -408,6 +422,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     projecting.add_argument("--step", type=Path, required=True)
     projecting.add_argument("--output", type=Path, required=True)
+    sheet = subparsers.add_parser(
+        "sheet", help="ISO drawing sheet with views and dimensions for a demo or design run"
+    )
+    sheet.add_argument("--run", type=Path, required=True, help="demo or route-design output")
+    sheet.add_argument("--output", type=Path, required=True)
+    sheet.add_argument("--number", help="drawing number for the title block")
     drawing = subparsers.add_parser(
         "drawing", help="convert a DWG/DXF drawing to DXF, an SVG view and a JSON summary"
     )
@@ -500,6 +520,8 @@ def main(argv: list[str] | None = None) -> int:
             return run_export_dwg(args.input, args.output, args.release)
         if args.command == "project":
             return run_project(args.step, args.output)
+        if args.command == "sheet":
+            return run_sheet(args.run, args.output, args.number)
         if args.command == "drawing":
             return run_drawing(args.input, args.output)
         if args.command == "audit-step":
