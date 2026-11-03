@@ -305,6 +305,11 @@ verified by the deterministic pipeline, and the changed values are explained; a 
 one is discarded. `apply_change` refuses any proposal the user has not confirmed through
 the interface, even when the assistant claims confirmation.
 
+Both web pages have an **Ask Syntera** panel. It sends questions to `/api/assistant`
+(with the open drawing on the drawings page), shows answers with their citations, and
+clicking a citation highlights it: a drawing entity is centred on the 2D sheet, a line
+is selected in the 3D workbench. The panel only displays what the server returns.
+
 ```bash
 python -m syntera.cli assistant-eval
 ANTHROPIC_API_KEY=... python -m syntera.cli assistant-eval --mode anthropic

@@ -199,3 +199,18 @@ svg.profile { width: 100%; height: auto; display: block; }
 .embedded .topbar .brand, .embedded .topbar a[href="/drawings"], .embedded .titleblock { display: none; }
 .embedded .app { padding-block: 8px; padding-inline: 8px; gap: 8px; height: 100vh; grid-template-rows: auto auto minmax(0, 1fr); }
 .embedded .main { min-height: 0; }
+
+/* assistant panel (G1) */
+.assist-toggle { position: fixed; right: 16px; bottom: 16px; z-index: 40; }
+.assist-panel { position: fixed; right: 16px; bottom: 60px; z-index: 40; width: min(420px, calc(100vw - 32px)); max-height: 70vh; display: flex; flex-direction: column; gap: 8px; padding: 12px; background: var(--panel, #fff); color: inherit; border: 1px solid var(--line, #ccc); border-radius: 8px; box-shadow: 0 8px 24px rgba(0, 0, 0, .18); }
+.assist-panel[hidden] { display: none; }
+.assist-panel header { display: flex; flex-direction: column; gap: 2px; }
+.assist-log { overflow: auto; display: flex; flex-direction: column; gap: 8px; min-height: 60px; }
+.assist-turn p { margin: 0; white-space: pre-wrap; }
+.assist-turn.user { align-self: flex-end; opacity: .85; }
+.assist-turn.error { color: var(--fail, #b00); }
+.assist-cites { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.assist-cites .chip { font-size: 11px; padding: 2px 6px; border-radius: 10px; border: 1px solid var(--line, #ccc); background: transparent; color: inherit; cursor: pointer; }
+.assist-input { display: flex; gap: 6px; }
+.assist-input textarea { flex: 1; resize: vertical; font: inherit; }
+.assist-note { font-size: 11px; opacity: .7; margin: 0; }
