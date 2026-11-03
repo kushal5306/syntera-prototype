@@ -56,7 +56,7 @@ Status values: `todo`, `in-review` (PR open), `done` (merged), `blocked` (reason
 | 26 | G3 | Generated sheet viewer and downloads | Web | C2, D1 | done | [#49](https://github.com/kushal5306/syntera-prototype/pull/49) |
 | 27 | G4 | Design history | Web | A4 | done | [#48](https://github.com/kushal5306/syntera-prototype/pull/48) |
 | 28 | H1 | Optimisation problem schema | Optimisation | A4 | done | [#50](https://github.com/kushal5306/syntera-prototype/pull/50) |
-| 29 | H2 | Verified optimiser | Optimisation | H1 | todo | |
+| 29 | H2 | Verified optimiser | Optimisation | H1 | done | [#51](https://github.com/kushal5306/syntera-prototype/pull/51) |
 | 30 | H3 | Optimisation report and view | Optimisation | H2 | todo | |
 | 31 | I1 | Background jobs | Platform | - | todo | |
 | 32 | I2 | Content-addressed run cache and storage interface | Platform | I1 | todo | |
