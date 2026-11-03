@@ -31,6 +31,7 @@ from syntera.schemas import (
     Obstacle,
     Point3,
     Port,
+    RouteResult,
     RoutingWeights,
     StepObstacle,
     TubeSpecification,
@@ -333,6 +334,56 @@ def run_rationale(design: DesignDocument, line_id: str | None = None) -> list[Ra
         if path is not None:
             records.append(record.model_copy(update={"path": path}))
     return sorted(records, key=lambda record: record.path)
+
+
+def with_route(design: DesignDocument, line_id: str, route: RouteResult) -> DesignDocument:
+    """The design with ``line_id``'s stored route replaced by ``route`` (removed if not found).
+
+    Routes are pipeline outputs recorded for traceability; they are never read back as
+    obstacles or evidence, and the assurance verdict stays in ``assurance_report.json``.
+    """
+    design.line(line_id)  # refuse unknown lines
+    routes = [record for record in design.routes if record.line != line_id]
+    if route.found and len(route.points) >= 2:
+        routes.append(RouteRecord(line=line_id, points=route.points, length_mm=route.length))
+    routes.sort(key=lambda record: record.line)
+    return design.model_copy(update={"routes": routes})
+
+
+def load_design_input(path: str | Path) -> DesignDocument:
+    """A design from ``design.json`` (any ``.json`` file) or converted from a YAML config."""
+    source = Path(path)
+    if source.suffix.lower() == ".json":
+        return load_design(source)
+    return design_from_yaml(source)
+
+
+def load_run(
+    path: str | Path, line_id: str | None = None
+) -> tuple[DesignDocument, DemoConfig, list[Rationale]]:
+    """Design, run configuration and rationale for one line of a design or YAML input.
+
+    Every run (demo, FEA evaluation, web) derives its configuration from the design
+    document this way, so identical design input gives identical outputs.
+    """
+    design = load_design_input(path)
+    line = design.line(line_id)
+    return design, run_config(design, line.id), run_rationale(design, line.id)
+
+
+def rationale_still_applies(config: DemoConfig, records: Iterable[Rationale]) -> list[Rationale]:
+    """The design records that still describe ``config`` after a client edited it.
+
+    A record is kept only while ``config`` still has the value it explains (records for
+    inputs that are not part of a run configuration, such as ``line_sizing.``, are kept);
+    every edited value is then derived from ``config`` and reported as the user's.
+    """
+    current = {record.path: record.value for record in config_rationale(config)}
+    return [
+        record
+        for record in records
+        if record.path not in current or current[record.path] == record.value
+    ]
 
 
 # ---- persistence ----------------------------------------------------------------------

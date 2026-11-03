@@ -23,6 +23,7 @@ def test_demo_generates_assured_outputs(tmp_path):
         "metrics.json",
         "layout.dxf",
         "rationale.json",
+        "design.json",
         "fea",
     }
     assert expected == {path.name for path in output.iterdir()}

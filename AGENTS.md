@@ -13,6 +13,7 @@ docker compose up --build
 python -m pip install -e ".[dev]"
 python -m syntera.cli demo --config examples/demo_skid.yaml --output outputs/demo
 python -m syntera.cli design --config examples/demo_skid_sized.yaml --output outputs/design
+python -m syntera.cli demo --config outputs/design/design.json --output outputs/from-design
 python -m syntera.cli fea-evaluate --config examples/demo_skid.yaml --output outputs/demo
 python -m syntera.cli compare --baseline examples/baseline_skid.yaml --output outputs/demo
 python -m syntera.cli kpi1 --log outputs/time_log.jsonl --baseline examples/manual_baseline.yaml --output outputs/demo
