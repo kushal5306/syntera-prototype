@@ -12,6 +12,7 @@ from fastapi.responses import FileResponse
 
 from syntera.drawings.convert import DrawingError, available_converters
 from syntera.drawings.export import dwg_writer
+from syntera.drawings.graph import GRAPH_FILE
 from syntera.drawings.intake import (
     DRAWING_ID,
     DXF_FILE,
@@ -39,6 +40,7 @@ DRAWING_FILES = {
     SVG_FILE: "image/svg+xml",
     DXF_FILE: "application/dxf",
     SUMMARY_FILE: "application/json",
+    GRAPH_FILE: "application/json",
 }
 LINE_FOLDER = re.compile(r"^line-[1-9][0-9]?$")
 DRAWN_TUBE_COLOUR = (0.93, 0.62, 0.16)

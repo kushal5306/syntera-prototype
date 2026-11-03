@@ -99,6 +99,12 @@ def _process(data: bytes, filename: str, kind: str, digest: str, folder: Path) -
         json.dumps(summary.model_dump(mode="json"), indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+    from syntera.drawings.graph import GRAPH_FILE, graph_from_file
+
+    (folder / GRAPH_FILE).write_text(
+        json.dumps(graph_from_file(dxf).model_dump(mode="json"), indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
     return summary
 
 

@@ -312,6 +312,18 @@ that carries attributes in any space with its attribute values and a keyword-rul
 (`title_block`, `bom_row` or `other`), external references (name, path, overlay, insert
 count), and MTEXT normalised to plain lines without formatting codes.
 
+Each drawing also gets `drawing_graph.json`, a semantic graph of the drawn space:
+geometry nodes (kind from the layer name, or from the design reference on Syntera's own
+sheets), labels attached to the nearest geometry within five text heights (inside a
+closed outline counts as touching; the smallest outline wins), dimensions linked to the
+geometry their definition points touch, and title-block attribute values. Queries in
+`syntera.drawings.graph`: `find_by_tag`, `label_of`, `dimensions_of`. Label links are
+proximity associations, not design facts.
+
+```bash
+python -m syntera.cli drawing-graph --input outputs/sheet/sheet.dxf --output outputs/graph --tag main
+```
+
 DWG is a closed format, so conversion uses an external program, chosen in this order:
 
 - **ODA File Converter** (`ODAFileConverter` on `PATH`): the most faithful reader. It is free

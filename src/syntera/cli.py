@@ -199,6 +199,40 @@ def run_sheet(run: Path, output: Path, number: str | None) -> int:
     return 0
 
 
+def run_drawing_graph(source: Path, output: Path, tag: str | None) -> int:
+    """Build the semantic graph of a DXF drawing and optionally look up a tag."""
+    from syntera.drawings.graph import (
+        GRAPH_FILE,
+        dimensions_of,
+        find_by_tag,
+        graph_from_file,
+        label_of,
+    )
+
+    graph = graph_from_file(source)
+    output.mkdir(parents=True, exist_ok=True)
+    write_json(graph, output / GRAPH_FILE)
+    attached = sum(label.attached_to is not None for label in graph.labels)
+    linked = sum(bool(dimension.measures) for dimension in graph.dimensions)
+    print(f"Drawing graph: {len(graph.nodes)} geometry nodes ({graph.space})")
+    print(f"Labels attached: {attached} of {len(graph.labels)}")
+    print(f"Dimensions linked: {linked} of {len(graph.dimensions)}")
+    if graph.title_block:
+        print("Title block: " + "; ".join(f"{k}={v}" for k, v in graph.title_block.items()))
+    if tag:
+        found = find_by_tag(graph, tag)
+        print(f"Tag {tag}: {len(found)} entity(ies)")
+        for node in found:
+            sizes = [f"{d.measurement:g}" for d in dimensions_of(graph, node.handle)
+                     if d.measurement is not None]  # fmt: skip
+            labels = label_of(graph, node.handle)
+            print(
+                f"- {node.type} {node.handle} on {node.layer}: labels {labels}, dimensions {sizes}"
+            )
+    print(f"Graph: {output / GRAPH_FILE}")
+    return 0
+
+
 def run_drawing(source: Path, output: Path) -> int:
     """Convert (if DWG), read and render one drawing into ``output/<drawing_id>``."""
     from syntera.drawings.intake import SUMMARY_FILE, ingest_drawing
@@ -428,6 +462,12 @@ def build_parser() -> argparse.ArgumentParser:
     sheet.add_argument("--run", type=Path, required=True, help="demo or route-design output")
     sheet.add_argument("--output", type=Path, required=True)
     sheet.add_argument("--number", help="drawing number for the title block")
+    graph = subparsers.add_parser(
+        "drawing-graph", help="semantic graph of a DXF: labels, dimensions, title block"
+    )
+    graph.add_argument("--input", type=Path, required=True)
+    graph.add_argument("--output", type=Path, required=True)
+    graph.add_argument("--tag", help="look up the entities carrying this tag")
     drawing = subparsers.add_parser(
         "drawing", help="convert a DWG/DXF drawing to DXF, an SVG view and a JSON summary"
     )
@@ -522,6 +562,8 @@ def main(argv: list[str] | None = None) -> int:
             return run_project(args.step, args.output)
         if args.command == "sheet":
             return run_sheet(args.run, args.output, args.number)
+        if args.command == "drawing-graph":
+            return run_drawing_graph(args.input, args.output, args.tag)
         if args.command == "drawing":
             return run_drawing(args.input, args.output)
         if args.command == "audit-step":
