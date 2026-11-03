@@ -27,9 +27,9 @@ Status values: `todo`, `in-review` (PR open), `done` (merged), `blocked` (reason
 | # | ID | Milestone | Layer | Depends on | Status | PR |
 |---|----|-----------|-------|------------|--------|----|
 | 1 | A1 | Rationale schema | Design model | - | done | [#19](https://github.com/kushal5306/syntera-prototype/pull/19) |
-| 2a | A2a | Deterministic engineering rule library: rules, tables, config sizing | Design model | A1 | in-review | [#22](https://github.com/kushal5306/syntera-prototype/pull/22) |
-| 2b | A2b | Demo, compare and web runs size a line from flow | Design model | A2a | in-review | [#23](https://github.com/kushal5306/syntera-prototype/pull/23) |
-| 3a | A3a | Canonical design document: schema, conversion, persistence, migration | Design model | A1 | in-review | [#24](https://github.com/kushal5306/syntera-prototype/pull/24) |
+| 2a | A2a | Deterministic engineering rule library: rules, tables, config sizing | Design model | A1 | done | [#22](https://github.com/kushal5306/syntera-prototype/pull/22) |
+| 2b | A2b | Demo, compare and web runs size a line from flow | Design model | A2a | done | [#23](https://github.com/kushal5306/syntera-prototype/pull/23) |
+| 3a | A3a | Canonical design document: schema, conversion, persistence, migration | Design model | A1 | done | [#24](https://github.com/kushal5306/syntera-prototype/pull/24) |
 | 3b | A3b | CLI and web runs derive all outputs from the design document | Design model | A3a | todo | |
 | 4 | B1 | Multi-line design from the design document | 3D engine | A3a | todo | |
 | 5 | A4 | Change sets and design diff | Design model | A3a | todo | |
