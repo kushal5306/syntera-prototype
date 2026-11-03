@@ -394,6 +394,17 @@ proximity associations, not design facts.
 python -m syntera.cli drawing-graph --input outputs/sheet/sheet.dxf --output outputs/graph --tag main
 ```
 
+`drawing-edit` applies a drawing change set to an imported DXF: `move` an entity by an
+offset, `set_layer`, `set_text`, or `retag` a tag wherever it appears as a whole word in
+texts and block attributes. The DXF is edited as read, written to `edited.dxf` (and to
+DWG with `--dwg` when the ODA File Converter is installed), and `drawing_edit.json` lists
+the changed handles and a fingerprint of every entity's DXF tags before and after, so
+every untouched entity can be shown to be byte-stable.
+
+```bash
+python -m syntera.cli drawing-edit --input plan.dxf --changes edits.json --output outputs/edited
+```
+
 DWG is a closed format, so conversion uses an external program, chosen in this order:
 
 - **ODA File Converter** (`ODAFileConverter` on `PATH`): the most faithful reader. It is free

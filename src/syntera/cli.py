@@ -345,6 +345,25 @@ def run_isometrics(run: Path, output: Path) -> int:
     return 0
 
 
+def run_drawing_edit(source: Path, changes_path: Path, output: Path, dwg: bool) -> int:
+    """Apply a drawing change set to a DXF, keeping every other entity byte-stable."""
+    from syntera.drawings.edit import EDIT_REPORT, EDITED_DXF, DrawingChangeSet, edit_dxf
+
+    changes = DrawingChangeSet.model_validate_json(changes_path.read_text(encoding="utf-8"))
+    report = edit_dxf(source, changes, output, dwg)
+    write_json(report, output / EDIT_REPORT)
+    stable = sum(
+        report.fingerprints_before[h] == report.fingerprints_after.get(h)
+        for h in report.fingerprints_before
+        if h not in report.changed
+    )
+    print(f"Applied: {changes.description} ({len(changes.edits)} edit(s))")
+    print(f"Changed entities: {', '.join(report.changed)}")
+    print(f"Untouched entities byte-stable: {stable} of {report.untouched}")
+    print(f"Drawing: {output / EDITED_DXF}" + (f"; DWG: {report.dwg}" if report.dwg else ""))
+    return 0 if stable == report.untouched else 2
+
+
 def run_drawing(source: Path, output: Path) -> int:
     """Convert (if DWG), read and render one drawing into ``output/<drawing_id>``."""
     from syntera.drawings.intake import SUMMARY_FILE, ingest_drawing
@@ -606,6 +625,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     isometrics.add_argument("--run", type=Path, required=True, help="run folder or design.json")
     isometrics.add_argument("--output", type=Path, required=True)
+    drawing_edit = subparsers.add_parser(
+        "drawing-edit", help="apply a change set to a DXF and write it back (DXF, optional DWG)"
+    )
+    drawing_edit.add_argument("--input", type=Path, required=True)
+    drawing_edit.add_argument("--changes", type=Path, required=True)
+    drawing_edit.add_argument("--output", type=Path, required=True)
+    drawing_edit.add_argument("--dwg", action="store_true", help="also write DWG (needs ODA)")
     drawing = subparsers.add_parser(
         "drawing", help="convert a DWG/DXF drawing to DXF, an SVG view and a JSON summary"
     )
@@ -710,6 +736,8 @@ def main(argv: list[str] | None = None) -> int:
             return run_explain(args)
         if args.command == "isometrics":
             return run_isometrics(args.run, args.output)
+        if args.command == "drawing-edit":
+            return run_drawing_edit(args.input, args.changes, args.output, args.dwg)
         if args.command == "drawing":
             return run_drawing(args.input, args.output)
         if args.command == "audit-step":
