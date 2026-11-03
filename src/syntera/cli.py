@@ -233,6 +233,29 @@ def run_drawing_graph(source: Path, output: Path, tag: str | None) -> int:
     return 0
 
 
+def run_knowledge(entry_id: str | None) -> int:
+    """List the knowledge entries, or show one with its rules and citations."""
+    from syntera.knowledge import load_knowledge
+
+    kb = load_knowledge()
+    if entry_id is None:
+        for entry in kb.entries:
+            flag = " (synthetic)" if entry.synthetic else ""
+            print(f"{entry.id}: {entry.title}{flag}")
+        print(f"{len(kb.entries)} entries")
+        return 0
+    entry = kb.get(entry_id)
+    print(f"{entry.title} [{entry.kind}]")
+    print(entry.summary)
+    print(entry.detail)
+    for rule in entry.rules:
+        print(f"- rule {rule}")
+    for citation in entry.citations:
+        note = f" ({citation.note})" if citation.note else ""
+        print(f"- cites [{citation.kind}] {citation.source}{note}")
+    return 0
+
+
 def run_drawing(source: Path, output: Path) -> int:
     """Convert (if DWG), read and render one drawing into ``output/<drawing_id>``."""
     from syntera.drawings.intake import SUMMARY_FILE, ingest_drawing
@@ -468,6 +491,10 @@ def build_parser() -> argparse.ArgumentParser:
     graph.add_argument("--input", type=Path, required=True)
     graph.add_argument("--output", type=Path, required=True)
     graph.add_argument("--tag", help="look up the entities carrying this tag")
+    knowledge = subparsers.add_parser(
+        "knowledge", help="list knowledge entries or show one with its citations"
+    )
+    knowledge.add_argument("--id", dest="entry_id")
     drawing = subparsers.add_parser(
         "drawing", help="convert a DWG/DXF drawing to DXF, an SVG view and a JSON summary"
     )
@@ -564,6 +591,8 @@ def main(argv: list[str] | None = None) -> int:
             return run_sheet(args.run, args.output, args.number)
         if args.command == "drawing-graph":
             return run_drawing_graph(args.input, args.output, args.tag)
+        if args.command == "knowledge":
+            return run_knowledge(args.entry_id)
         if args.command == "drawing":
             return run_drawing(args.input, args.output)
         if args.command == "audit-step":

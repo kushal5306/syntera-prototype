@@ -1,0 +1,78 @@
+- id: kb.rule.long_radius_bend
+  kind: rule
+  title: Long-radius bends (1.5 x OD)
+  summary: >-
+    Bends use a centreline radius of 1.5 times the outside diameter, the usual
+    long-radius proportion, which keeps pressure loss and wall thinning low.
+  detail: >-
+    A tighter bend thins the outer wall and ovalises the tube during bending; a larger
+    one takes more space. 1.5 D is the long-radius proportion used for most process
+    lines. The exact checks then confirm that every generated bend meets this radius.
+  rules:
+    - rules.bend_radius_long_radius.v1
+    - pid.bend_radius_long_radius.v1
+    - drawing.bend_radius_long_radius.v1
+    - drawing.bend_radius_at_least_tube_radius.v1
+  keywords: [bend radius, long radius, elbow, 1.5D]
+  synthetic: false
+  citations:
+    - kind: practice
+      source: Long-radius elbow proportion of 1.5 x nominal diameter used for butt-weld fittings
+
+- id: kb.rule.clearance
+  kind: rule
+  title: Clearance around pipes
+  summary: >-
+    Pipes keep a gap to equipment and other pipes of half their outside diameter, never
+    less than a fixed floor, leaving room for access, insulation and tolerances.
+  detail: >-
+    Clearance is measured surface to surface on the exact geometry. The half-OD rule
+    scales the gap with pipe size; the floor keeps small tubes from being packed too
+    tightly. Clearance is a hard constraint: routing costs never trade it away.
+  rules:
+    - rules.clearance_half_od_with_floor.v1
+    - pid.clearance_half_od_min_25.v1
+    - drawing.clearance_half_od.v1
+  keywords: [clearance, spacing, access, insulation, gap]
+  synthetic: false
+  citations:
+    - kind: practice
+      source: Layout practice of minimum spacing between pipes and from equipment for access and insulation
+
+- id: kb.practice.routing_grid
+  kind: practice
+  title: Routing grid and routing costs
+  summary: >-
+    Routes are searched on a regular grid; the finest standard step within a node budget
+    is used, and bend and proximity costs scale with the step.
+  detail: >-
+    A finer grid finds shorter routes but costs time and memory, so Syntera picks the
+    finest step from a fixed list that keeps the grid under a node budget. Bend and
+    obstacle-proximity costs rank routes only; port direction and clearance are hard
+    constraints enforced by the router and the exact checks.
+  rules:
+    - grid.finest_standard_step.v1
+    - pid.routing_weights_from_grid.v1
+    - drawing.routing_weights_from_grid.v1
+  keywords: [grid, voxel, routing cost, A*, bend cost]
+  synthetic: false
+  citations:
+    - kind: textbook
+      source: A* shortest-path search on grid graphs, in algorithms texts
+
+- id: kb.practice.largest_bore_first
+  kind: practice
+  title: Route the largest bore first
+  summary: >-
+    In a multi-line design the biggest pipes are routed first so they get the most direct
+    runs; smaller, more flexible lines route around them.
+  detail: >-
+    Large pipes are expensive per metre and hard to bend, so they should take the short
+    paths. Lines of equal size are routed in line-id order so the result never depends
+    on input order. Every line is still verified on its own and against every other.
+  rules: [design.largest_bore_first.v1]
+  keywords: [routing order, multi-line, large bore]
+  synthetic: false
+  citations:
+    - kind: practice
+      source: Piping layout practice of placing large-bore lines before small-bore lines
