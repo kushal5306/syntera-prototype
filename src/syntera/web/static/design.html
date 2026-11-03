@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Syntera Design</title>
+    <link rel="stylesheet" href="/assets/styles.css">
+    <link rel="stylesheet" href="/assets/design.css">
+  </head>
+  <body>
+    <main class="design-page">
+      <header class="design-head">
+        <div><b>Syntera</b> · <span id="design-title">Design</span></div>
+        <nav><a href="/">Workbench</a> · <a href="/drawings">Drawings</a></nav>
+      </header>
+      <section aria-labelledby="values-h">
+        <h2 id="values-h">Parameters <span class="muted" id="version-chip"></span></h2>
+        <p class="muted">Edit a value, preview the change, then apply it. Every value shows where it came from.</p>
+        <table class="values"><thead><tr><th>Parameter</th><th>Value</th><th>Source</th><th>Why</th></tr></thead><tbody id="values"></tbody></table>
+        <div class="actions">
+          <label><input type="checkbox" id="regenerate" checked> Route and verify after applying</label>
+          <button class="btn" id="preview" type="button">Preview change</button>
+          <button class="btn primary" id="apply" type="button" disabled>Apply change</button>
+        </div>
+        <div id="diff" class="diff" aria-live="polite"></div>
+      </section>
+      <section aria-labelledby="history-h">
+        <h2 id="history-h">History</h2>
+        <ol id="versions" class="versions"></ol>
+        <div class="actions">
+          <label>Compare <select id="compare-a" aria-label="Earlier version"></select></label>
+          <label>with <select id="compare-b" aria-label="Later version"></select></label>
+          <button class="btn" id="compare" type="button">Compare</button>
+        </div>
+        <div id="compare-out" class="diff" aria-live="polite"></div>
+      </section>
+    </main>
+    <script src="/assets/design.js"></script>
+    <script src="/assets/assistant.js"></script>
+  </body>
+</html>

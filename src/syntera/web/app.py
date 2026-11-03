@@ -33,6 +33,7 @@ from syntera.rules import sizing_still_applies
 from syntera.schemas import DemoConfig, Label, StepObstacle, TimeActor
 from syntera.web.assistant import ProviderFactory, assistant_router
 from syntera.web.audit import audit_router
+from syntera.web.design_api import design_router
 from syntera.web.drawings import drawings_router
 from syntera.web.mesh import scene_meshes
 from syntera.web.pid import pid_router
@@ -118,6 +119,7 @@ def create_app(
     app.include_router(drawings_router(output_root / "drawings"))
     app.include_router(pid_router(output_root / "pid"))
     app.include_router(audit_router(output_root / "audit"))
+    app.include_router(design_router(config_path, output_root / "design"))
     app.include_router(
         assistant_router(config_path, output_root, assistant_provider or provider_from_env)
     )
@@ -135,6 +137,10 @@ def create_app(
     @app.get("/", include_in_schema=False)
     def index() -> FileResponse:
         return FileResponse(static / "index.html")
+
+    @app.get("/design", include_in_schema=False)
+    def design_page() -> FileResponse:
+        return FileResponse(static / "design.html")
 
     @app.get("/drawings", include_in_schema=False)
     def drawings_page() -> FileResponse:

@@ -1,0 +1,14 @@
+.design-page { max-width: 1100px; margin: 0 auto; padding: 16px; display: flex; flex-direction: column; gap: 24px; }
+.design-head { display: flex; justify-content: space-between; align-items: center; }
+.muted { opacity: .7; font-size: 13px; }
+.values { width: 100%; border-collapse: collapse; font-size: 13px; }
+.values th, .values td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line, #ddd); vertical-align: top; }
+.values input { width: 7em; font: inherit; }
+.values td.why { opacity: .8; }
+.actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 10px; }
+.diff table { border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+.diff td, .diff th { padding: 3px 8px; border-bottom: 1px solid var(--line, #ddd); }
+.diff .verdict-pass { color: var(--pass, #187a3c); }
+.diff .verdict-fail { color: var(--fail, #b00); }
+.versions { font-size: 13px; }
+@media (max-width: 640px) { .values td.why { display: none; } }
