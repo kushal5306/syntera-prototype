@@ -1,0 +1,62 @@
+# Assistant evaluation suite (roadmap F5). Each case asks a question about an example
+# design or a fixture drawing and lists facts the answer must contain and citations it
+# must carry. In scripted mode a deterministic provider calls the hinted tool and answers
+# from its result, so CI checks the tools; with a real model the hints are ignored.
+# Arguments starting with "$tag:" resolve to the handle of the entity with that tag.
+- id: od_from_flow
+  question: Why is the main line's outside diameter 20 mm?
+  design: examples/demo_skid_sized.yaml
+  tool: explain
+  arguments: {path: tube.outer_diameter}
+  facts: ["20 mm", "smallest standard tube"]
+  citations: [lines.main.tube.outer_diameter, rules.tube_size_from_flow.v1]
+- id: bend_radius_rule
+  question: How was the bend radius chosen?
+  design: examples/demo_skid_sized.yaml
+  tool: explain
+  arguments: {path: tube.minimum_bend_radius}
+  facts: ["30 mm", "1.5"]
+  citations: [rules.bend_radius_long_radius.v1, kb.rule.long_radius_bend]
+- id: clearance_is_user_input
+  question: Where does the 20 mm clearance come from?
+  design: examples/demo_skid.yaml
+  tool: explain
+  arguments: {path: tube.minimum_clearance}
+  facts: ["Given by the user", "20 mm"]
+  citations: [lines.main.tube.minimum_clearance]
+- id: wall_thickness_engineer
+  question: Show the wall thickness calculation.
+  design: examples/demo_skid_sized.yaml
+  tool: explain
+  arguments: {path: sizing.minimum_wall_thickness, mode: engineer}
+  facts: ["hoop", "MPa"]
+  citations: [rules.wall_thickness_hoop_stress.v1]
+- id: find_pump_on_drawing
+  question: Where is pump P-101 on the plan?
+  design: examples/demo_skid.yaml
+  drawing: pump_plan
+  tool: query_drawing
+  arguments: {drawing: pump_plan, tag: P-101}
+  facts: ["PUMP P-101", "600"]
+  citations: ["drawing:pump_plan:"]
+- id: velocity_from_drawing
+  question: What is the velocity in line L-001 at 36 m3/h with a 3.9 mm wall?
+  design: examples/demo_skid.yaml
+  drawing: pump_plan
+  tool: explain
+  arguments: {drawing: pump_plan, handle: "$tag:L-001", flow_m3_per_h: 36, wall_mm: 3.9}
+  facts: ["Inferred", "4.6", "52.5 mm"]
+  citations: ["drawing:pump_plan:", rules.flow_velocity_from_flow_and_bore.v1]
+- id: spool_knowledge
+  question: What limits how long a spool can be?
+  design: examples/demo_skid.yaml
+  tool: search
+  arguments: {query: spool length cut weld}
+  facts: ["spool"]
+  citations: [kb.rule.spool_split]
+- id: verdict_needs_checks
+  question: Does this design pass?
+  design: examples/demo_skid.yaml
+  answer: It passes.
+  facts: ["no checks were run"]
+  citations: []

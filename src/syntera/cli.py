@@ -392,6 +392,26 @@ def run_ask(design: Path, question: str, output: Path, max_steps: int) -> int:
     return 0 if result.stopped == "answer" else 2
 
 
+def run_assistant_eval(mode: str, output: Path) -> int:
+    """Run the assistant evaluation suite and report per-question results."""
+    from syntera.assistant.evaluation import EVAL_FILE, run_suite
+
+    report = run_suite(output, mode)  # type: ignore[arg-type]
+    output.mkdir(parents=True, exist_ok=True)
+    write_json(report, output / EVAL_FILE)
+    for case in report.cases:
+        status = "PASS" if case.passed else "FAIL"
+        detail = ""
+        if case.missing_facts:
+            detail += f" missing facts {case.missing_facts}"
+        if case.missing_citations:
+            detail += f" missing citations {case.missing_citations}"
+        print(f"{status} {case.id}{detail}")
+    print(f"{report.passed} of {report.total} questions answered as expected ({report.provider})")
+    print(f"Report: {output / EVAL_FILE}")
+    return 0 if report.passed == report.total else 2
+
+
 def run_drawing(source: Path, output: Path) -> int:
     """Convert (if DWG), read and render one drawing into ``output/<drawing_id>``."""
     from syntera.drawings.intake import SUMMARY_FILE, ingest_drawing
@@ -661,6 +681,11 @@ def build_parser() -> argparse.ArgumentParser:
     drawing_edit.add_argument("--output", type=Path, required=True)
     drawing_edit.add_argument("--dwg", action="store_true", help="also write DWG (needs ODA)")
     subparsers.add_parser("assistant-tools", help="print the assistant tool JSON schemas")
+    evaluation = subparsers.add_parser(
+        "assistant-eval", help="run the assistant evaluation suite (scripted or a real model)"
+    )
+    evaluation.add_argument("--mode", choices=["scripted", "anthropic"], default="scripted")
+    evaluation.add_argument("--output", type=Path, default=Path("outputs/assistant-eval"))
     ask = subparsers.add_parser("ask", help="ask the assistant (needs ANTHROPIC_API_KEY)")
     ask.add_argument("--design", type=Path, required=True)
     ask.add_argument("--question", required=True)
@@ -774,6 +799,8 @@ def main(argv: list[str] | None = None) -> int:
             return run_drawing_edit(args.input, args.changes, args.output, args.dwg)
         if args.command == "ask":
             return run_ask(args.design, args.question, args.output, args.max_steps)
+        if args.command == "assistant-eval":
+            return run_assistant_eval(args.mode, args.output)
         if args.command == "assistant-tools":
             return run_assistant_tools()
         if args.command == "drawing":

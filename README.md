@@ -291,6 +291,17 @@ tools that ran, whether a check ran, and citations read from the tool results
 runs). `GET /api/assistant/status` says whether a model is configured; without one the
 endpoint returns 503.
 
+The assistant evaluation suite (`src/syntera/assistant/eval_cases.yaml`) asks questions
+about the example designs and a fixture drawing and checks each answer for expected
+facts and citations. In CI a scripted provider calls each case's hinted tool and answers
+only from its result, so the suite checks the tools; `--mode anthropic` evaluates a real
+model. Results are reported per question in `assistant_eval.json`.
+
+```bash
+python -m syntera.cli assistant-eval
+ANTHROPIC_API_KEY=... python -m syntera.cli assistant-eval --mode anthropic
+```
+
 `layout.dxf` is a general-arrangement drawing in millimetres: plan, front elevation and
 right elevation (third-angle) of the equipment, the nozzles and the routed tube drawn
 along its exact tangent/arc centreline at its outer diameter, with overall dimensions
