@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 from syntera.analysis.calculix import input_sha256
 from syntera.analysis.fields import parse_case_fields, parse_mesh_inp, solve_decks
 from syntera.analysis.results import evaluate_acceptance
+from syntera.assistant.agent import provider_from_env
 from syntera.design import load_run, rationale_still_applies
 from syntera.geometry.cad import assembly_shapes
 from syntera.geometry.step_import import StepImportError
@@ -30,6 +31,7 @@ from syntera.reporting.timelog import (
 )
 from syntera.rules import sizing_still_applies
 from syntera.schemas import DemoConfig, Label, StepObstacle, TimeActor
+from syntera.web.assistant import ProviderFactory, assistant_router
 from syntera.web.audit import audit_router
 from syntera.web.drawings import drawings_router
 from syntera.web.mesh import scene_meshes
@@ -100,7 +102,10 @@ class TimeMark(BaseModel):
 
 
 def create_app(
-    config_path: Path, output_root: Path, manual_baseline: Path | None = None
+    config_path: Path,
+    output_root: Path,
+    manual_baseline: Path | None = None,
+    assistant_provider: ProviderFactory | None = None,
 ) -> FastAPI:
     """Create an application bound to one initial config and controlled output root."""
     static = Path(__file__).with_name("static")
@@ -113,6 +118,9 @@ def create_app(
     app.include_router(drawings_router(output_root / "drawings"))
     app.include_router(pid_router(output_root / "pid"))
     app.include_router(audit_router(output_root / "audit"))
+    app.include_router(
+        assistant_router(config_path, output_root, assistant_provider or provider_from_env)
+    )
 
     def checked(config: DemoConfig) -> DemoConfig:
         """Only STEP files named by the server-side config may be opened from a request."""

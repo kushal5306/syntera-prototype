@@ -284,6 +284,13 @@ about passing or failing when no check ran in the conversation gets a warning ap
 ANTHROPIC_API_KEY=... python -m syntera.cli ask --design examples/demo_skid_sized.yaml --question "Why is the pipe 20 mm?"
 ```
 
+In the web app, `POST /api/assistant` with `{"question", "drawing_id"?, "history"?}`
+answers about the configured design or a stored drawing and returns the answer, the
+tools that ran, whether a check ran, and citations read from the tool results
+(rationale paths, rule ids, knowledge entries, drawing entity ids, proposals, check
+runs). `GET /api/assistant/status` says whether a model is configured; without one the
+endpoint returns 503.
+
 `layout.dxf` is a general-arrangement drawing in millimetres: plan, front elevation and
 right elevation (third-angle) of the equipment, the nozzles and the routed tube drawn
 along its exact tangent/arc centreline at its outer diameter, with overall dimensions
