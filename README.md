@@ -262,6 +262,17 @@ supported within the span fails the assurance.
 python -m syntera.cli demo --config examples/demo_skid_supports.yaml --output outputs/supports
 ```
 
+### Assistant tools
+
+An assistant acts only through typed tools over the deterministic functions
+(`syntera.assistant.tools`): `query_design`, `query_drawing`, `explain`, `search`,
+`run_checks`, `propose_change`, `apply_change`, `regenerate` and `compare`, each with a
+JSON schema (`syntera assistant-tools`). Verdicts come only from `run_checks` and
+`regenerate`, which run the exact geometry checks. No tool input can carry a verdict,
+and a proposal changes nothing until `apply_change` is called with `user_confirmed`.
+Assistant change sets cannot write routes or rationale, set acceptance thresholds, or
+add analysis to a new line; those stay with the user.
+
 `layout.dxf` is a general-arrangement drawing in millimetres: plan, front elevation and
 right elevation (third-angle) of the equipment, the nozzles and the routed tube drawn
 along its exact tangent/arc centreline at its outer diameter, with overall dimensions

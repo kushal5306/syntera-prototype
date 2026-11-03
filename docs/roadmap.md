@@ -46,7 +46,7 @@ Status values: `todo`, `in-review` (PR open), `done` (merged), `blocked` (reason
 | 16 | C3 | Line isometrics and bill of materials | 2D drawings | B2, C2 | done | [#39](https://github.com/kushal5306/syntera-prototype/pull/39) |
 | 17 | B3 | Supports and spool splitting | 3D engine | B2 | done | [#40](https://github.com/kushal5306/syntera-prototype/pull/40) |
 | 18 | D4 | Round-trip DXF editing | DWG I/O | A4, D3 | done | [#41](https://github.com/kushal5306/syntera-prototype/pull/41) |
-| 19 | F1 | Assistant tool API | Intelligence | A4, D3, E3 | todo | |
+| 19 | F1 | Assistant tool API | Intelligence | A4, D3, E3 | done | [#42](https://github.com/kushal5306/syntera-prototype/pull/42) |
 | 20 | F2 | LLM provider interface and agent loop | Intelligence | F1 | todo | |
 | 21 | F3 | Drawing and design Q&A endpoint | Intelligence | F2 | todo | |
 | 22 | F5 | Assistant evaluation suite | Intelligence | F3 | todo | |

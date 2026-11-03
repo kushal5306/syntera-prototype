@@ -364,6 +364,16 @@ def run_drawing_edit(source: Path, changes_path: Path, output: Path, dwg: bool) 
     return 0 if stable == report.untouched else 2
 
 
+def run_assistant_tools() -> int:
+    """Print the assistant tool definitions as JSON schemas."""
+    import json
+
+    from syntera.assistant.tools import tool_schemas
+
+    print(json.dumps(tool_schemas(), indent=2, sort_keys=True))
+    return 0
+
+
 def run_drawing(source: Path, output: Path) -> int:
     """Convert (if DWG), read and render one drawing into ``output/<drawing_id>``."""
     from syntera.drawings.intake import SUMMARY_FILE, ingest_drawing
@@ -632,6 +642,7 @@ def build_parser() -> argparse.ArgumentParser:
     drawing_edit.add_argument("--changes", type=Path, required=True)
     drawing_edit.add_argument("--output", type=Path, required=True)
     drawing_edit.add_argument("--dwg", action="store_true", help="also write DWG (needs ODA)")
+    subparsers.add_parser("assistant-tools", help="print the assistant tool JSON schemas")
     drawing = subparsers.add_parser(
         "drawing", help="convert a DWG/DXF drawing to DXF, an SVG view and a JSON summary"
     )
@@ -738,6 +749,8 @@ def main(argv: list[str] | None = None) -> int:
             return run_isometrics(args.run, args.output)
         if args.command == "drawing-edit":
             return run_drawing_edit(args.input, args.changes, args.output, args.dwg)
+        if args.command == "assistant-tools":
+            return run_assistant_tools()
         if args.command == "drawing":
             return run_drawing(args.input, args.output)
         if args.command == "audit-step":
