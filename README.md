@@ -202,6 +202,14 @@ tables say so, and long quotations are refused by the loader.
 python -m syntera.cli knowledge --id kb.rule.hoop_stress_wall
 ```
 
+`search` ranks knowledge entries, design rationale records and drawing-graph entities
+together with Okapi BM25 over a fixed tokeniser: no network and no learned model, ties
+broken by document id, so the same corpus and query always give the same ranking.
+
+```bash
+python -m syntera.cli search --query "why is the bend radius 30 mm" --design examples/demo_skid_sized.yaml
+```
+
 `layout.dxf` is a general-arrangement drawing in millimetres: plan, front elevation and
 right elevation (third-angle) of the equipment, the nozzles and the routed tube drawn
 along its exact tangent/arc centreline at its outer diameter, with overall dimensions
