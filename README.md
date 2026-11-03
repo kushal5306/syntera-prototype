@@ -210,6 +210,19 @@ broken by document id, so the same corpus and query always give the same ranking
 python -m syntera.cli search --query "why is the bend radius 30 mm" --design examples/demo_skid_sized.yaml
 ```
 
+`explain` answers why a value is what it is, from its rationale record, the rule that set
+it, that rule's knowledge entry and citations, and the values it depends on. `plain` mode
+is for anyone; `engineer` mode adds inputs, formulae, rule ids and references. For a
+foreign drawing it explains an entity from its labels and dimensions, or back-calculates
+flow velocity from a stated diameter (OD label, diameter dimension or DN size) and a given
+flow; every drawing explanation is labelled as inference. Explanations never state or
+change a verdict.
+
+```bash
+python -m syntera.cli explain --design examples/demo_skid_sized.yaml --path tube.outer_diameter --mode engineer
+python -m syntera.cli explain --graph outputs/drawings/<id>/drawing_graph.json --handle 2F --flow 36 --wall 3.9
+```
+
 `layout.dxf` is a general-arrangement drawing in millimetres: plan, front elevation and
 right elevation (third-angle) of the equipment, the nozzles and the routed tube drawn
 along its exact tangent/arc centreline at its outer diameter, with overall dimensions

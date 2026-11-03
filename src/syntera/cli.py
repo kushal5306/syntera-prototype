@@ -282,6 +282,43 @@ def run_search(query: str, designs: list[Path], graphs: list[Path], limit: int) 
     return 0
 
 
+def run_explain(args: argparse.Namespace) -> int:
+    """Explain a design value, or (as inference) a drawing entity or its flow velocity."""
+    from syntera.knowledge.explain import (
+        back_calculate_velocity,
+        explain_entity,
+        explain_value,
+    )
+
+    if args.design is not None:
+        from syntera.design import load_design_input
+
+        if not args.path:
+            raise ValueError("--path is required with --design")
+        explanation = explain_value(load_design_input(args.design), args.path, args.mode)
+    else:
+        from syntera.drawings.graph import DrawingGraph
+
+        if args.graph is None or not args.handle:
+            raise ValueError("give --design and --path, or --graph and --handle")
+        graph = DrawingGraph.model_validate_json(args.graph.read_bytes())
+        name = args.graph.parent.name or args.graph.stem
+        if args.flow is not None:
+            explanation = back_calculate_velocity(
+                graph, args.handle, name, args.flow, args.wall, mode=args.mode
+            )
+        else:
+            explanation = explain_entity(graph, args.handle, name, args.mode)
+    print(explanation.headline)
+    for step in explanation.steps:
+        print(f"- {step}")
+    for citation in explanation.citations:
+        print(f"Source: {citation}")
+    for caveat in explanation.caveats:
+        print(f"Note: {caveat}")
+    return 0
+
+
 def run_drawing(source: Path, output: Path) -> int:
     """Convert (if DWG), read and render one drawing into ``output/<drawing_id>``."""
     from syntera.drawings.intake import SUMMARY_FILE, ingest_drawing
@@ -528,6 +565,16 @@ def build_parser() -> argparse.ArgumentParser:
     search.add_argument("--design", type=Path, action="append", default=[])
     search.add_argument("--graph", type=Path, action="append", default=[])
     search.add_argument("--limit", type=int, default=10)
+    explain = subparsers.add_parser(
+        "explain", help="explain why a design value is what it is (or infer from a drawing)"
+    )
+    explain.add_argument("--design", type=Path, help="design.json or YAML config")
+    explain.add_argument("--path", help="rationale path, e.g. tube.outer_diameter")
+    explain.add_argument("--graph", type=Path, help="drawing_graph.json of a read drawing")
+    explain.add_argument("--handle", help="drawing entity handle")
+    explain.add_argument("--flow", type=float, help="flow (m3/h) to back-calculate velocity")
+    explain.add_argument("--wall", type=float, help="wall thickness (mm) for the bore")
+    explain.add_argument("--mode", choices=["plain", "engineer"], default="plain")
     drawing = subparsers.add_parser(
         "drawing", help="convert a DWG/DXF drawing to DXF, an SVG view and a JSON summary"
     )
@@ -628,6 +675,8 @@ def main(argv: list[str] | None = None) -> int:
             return run_knowledge(args.entry_id)
         if args.command == "search":
             return run_search(args.query, args.design, args.graph, args.limit)
+        if args.command == "explain":
+            return run_explain(args)
         if args.command == "drawing":
             return run_drawing(args.input, args.output)
         if args.command == "audit-step":
