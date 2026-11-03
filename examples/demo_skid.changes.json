@@ -1,0 +1,12 @@
+{
+  "description": "Synthetic example: wider clearance on the main line and move the pump 10 mm",
+  "edits": [
+    {
+      "op": "set_parameter",
+      "path": "lines.main.tube.minimum_clearance",
+      "value": 25,
+      "explanation": "Insulation allowance requested in review"
+    },
+    {"op": "move_equipment", "equipment": "auxiliary-pump", "offset": [0, -10, 0]}
+  ]
+}
