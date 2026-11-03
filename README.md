@@ -349,6 +349,14 @@ candidate and is not supported by the optimiser yet.
 python -m syntera.cli optimise --problem examples/demo_optimisation.yaml --output outputs/optimise
 ```
 
+Alongside `optimisation.json`, `optimise` writes `optimisation_report.json` and `.md`.
+They give the chosen design with its rationale, the trade-offs (each Pareto member's
+objectives against the chosen one), the sensitivity (the effect of one variable step
+from the chosen design, using evaluated neighbours) and why candidates were rejected.
+The **Optimisation** page (`/optimise`, `POST /api/optimise`) runs a small study (at most
+20 candidates) on the server's configured design and plots the Pareto set; a study cannot
+name another design.
+
 `layout.dxf` is a general-arrangement drawing in millimetres: plan, front elevation and
 right elevation (third-angle) of the equipment, the nozzles and the routed tube drawn
 along its exact tangent/arc centreline at its outer diameter, with overall dimensions

@@ -420,6 +420,11 @@ def run_optimise(problem_path: Path, output: Path) -> int:
     problem, design = load_problem(problem_path)
     result = optimise(problem, design, output)
     write_json(result, output / OPTIMISATION_FILE)
+    from syntera.optimise.report import MARKDOWN_FILE, REPORT_FILE, build_report, report_markdown
+
+    report = build_report(problem, result)
+    write_json(report, output / REPORT_FILE)
+    (output / MARKDOWN_FILE).write_text(report_markdown(report), encoding="utf-8")
     feasible = sum(e.feasible for e in result.evaluations)
     searched = f"{result.evaluated} of {result.search_space} candidates evaluated"
     print(f"{problem.title}: {searched} ({result.strategy}, seed {result.seed})")
