@@ -367,6 +367,13 @@ workbench run's CalculiX decks). The in-process queue runs one job at a time in
 submission order and keeps every job record on disk; a job interrupted by a restart is
 reported as failed. An external queue can implement the same `JobQueue` protocol.
 
+Identical runs are reused: a run is keyed by the SHA-256 of its kind, the Syntera version
+and the canonical design bytes, and its outputs are stored as a bundle with a hash
+manifest behind a `Storage` interface (`LocalStorage` today; object storage can be added
+behind the same interface). A restored run is byte-identical to a fresh one, and a
+damaged bundle is ignored and recomputed. The optimiser (`optimise --cache DIR`), the
+web optimisation study and `route-design` jobs use the cache.
+
 `layout.dxf` is a general-arrangement drawing in millimetres: plan, front elevation and
 right elevation (third-angle) of the equipment, the nozzles and the routed tube drawn
 along its exact tangent/arc centreline at its outer diameter, with overall dimensions

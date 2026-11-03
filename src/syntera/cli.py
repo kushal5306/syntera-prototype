@@ -412,13 +412,19 @@ def run_assistant_eval(mode: str, output: Path) -> int:
     return 0 if report.passed == report.total else 2
 
 
-def run_optimise(problem_path: Path, output: Path) -> int:
+def run_optimise(problem_path: Path, output: Path, cache_dir: Path | None = None) -> int:
     """Seeded, verified optimisation: every candidate routed and checked; Pareto set."""
     from syntera.optimise.optimiser import OPTIMISATION_FILE, optimise
     from syntera.optimise.problem import load_problem
 
     problem, design = load_problem(problem_path)
-    result = optimise(problem, design, output)
+    cache = None
+    if cache_dir is not None:
+        from syntera.cache import RunCache
+        from syntera.storage import LocalStorage
+
+        cache = RunCache(LocalStorage(cache_dir))
+    result = optimise(problem, design, output, cache)
     write_json(result, output / OPTIMISATION_FILE)
     from syntera.optimise.report import MARKDOWN_FILE, REPORT_FILE, build_report, report_markdown
 
@@ -435,6 +441,8 @@ def run_optimise(problem_path: Path, output: Path) -> int:
             values = ", ".join(f"{k}={v:g}" for k, v in evaluation.values.items())
             found = ", ".join(f"{k} {v:g}" for k, v in (evaluation.objectives or {}).items())
             print(f"- Pareto {evaluation.id}: {values} -> {found}{mark}")
+    if cache is not None:
+        print(f"Run cache: {cache.hits} reused, {cache.misses} routed")
     print(f"Report: {output / OPTIMISATION_FILE}")
     return 0 if result.chosen else 2
 
@@ -723,6 +731,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     optimising.add_argument("--problem", type=Path, required=True)
     optimising.add_argument("--output", type=Path, required=True)
+    optimising.add_argument("--cache", type=Path, help="reuse identical runs stored here")
     drawing = subparsers.add_parser(
         "drawing", help="convert a DWG/DXF drawing to DXF, an SVG view and a JSON summary"
     )
@@ -836,7 +845,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "assistant-tools":
             return run_assistant_tools()
         if args.command == "optimise":
-            return run_optimise(args.problem, args.output)
+            return run_optimise(args.problem, args.output, args.cache)
         if args.command == "drawing":
             return run_drawing(args.input, args.output)
         if args.command == "audit-step":

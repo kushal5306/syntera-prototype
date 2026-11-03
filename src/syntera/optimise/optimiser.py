@@ -18,6 +18,7 @@ from pathlib import Path
 import numpy as np
 from pydantic import BaseModel, ConfigDict
 
+from syntera.cache import RunCache
 from syntera.changes import apply_change_set
 from syntera.design import DesignDocument, DesignError
 from syntera.optimise.problem import (
@@ -101,8 +102,13 @@ def evaluate(
     values: dict[str, float],
     output: Path,
     index: int,
+    cache: RunCache | None = None,
 ) -> Evaluation:
-    """Apply, route and verify one candidate; reject it if any check or limit fails."""
+    """Apply, route and verify one candidate; reject it if any check or limit fails.
+
+    With a ``cache``, a candidate design identical to one routed before is restored from
+    its stored run instead of being routed again (the outputs are identical).
+    """
     from syntera.multiline import route_design
 
     candidate_id = f"c{index:04d}"
@@ -112,7 +118,10 @@ def evaluate(
         reasons = [f"invalid design: {error}"]
         return Evaluation(id=candidate_id, values=values, feasible=False, reasons=reasons,
                           objectives=None, output="")  # fmt: skip
-    run = route_design(changed, output / candidate_id)
+    if cache is not None:
+        run = cache.route_design(changed, output / candidate_id)
+    else:
+        run = route_design(changed, output / candidate_id)
     if not run.report.overall_pass:
         return Evaluation(id=candidate_id, values=values, feasible=False,
                           reasons=run.report.failure_reasons or ["checks failed"],
@@ -208,7 +217,10 @@ def _bayes_order(problem: OptimisationProblem, space, evaluate_at) -> None:
 
 
 def optimise(
-    problem: OptimisationProblem, design: DesignDocument, output: Path
+    problem: OptimisationProblem,
+    design: DesignDocument,
+    output: Path,
+    cache: RunCache | None = None,
 ) -> OptimisationResult:
     for name in problem.objectives:
         if name in UNSUPPORTED:
@@ -218,7 +230,7 @@ def optimise(
     evaluations: list[Evaluation] = []
 
     def evaluate_at(index: int) -> float:
-        result = evaluate(problem, design, space[index], output, len(evaluations) + 1)
+        result = evaluate(problem, design, space[index], output, len(evaluations) + 1, cache)
         evaluations.append(result)
         if not result.feasible or result.objectives is None:
             return 1e9  # only steers the search; infeasible designs never enter the results

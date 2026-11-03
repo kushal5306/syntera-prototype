@@ -15,6 +15,7 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
+from syntera.cache import RunCache
 from syntera.design import load_design_input
 from syntera.optimise.problem import (
     Constraints,
@@ -25,8 +26,18 @@ from syntera.optimise.problem import (
     Variable,
     check_problem,
 )
+from syntera.storage import LocalStorage
 
 WEB_BUDGET = 20
+_CACHES: dict[Path, RunCache] = {}
+
+
+def run_cache(output_root: Path) -> RunCache:
+    """The web app's shared run cache under ``<output>/cache``."""
+    root = output_root / "cache"
+    if root not in _CACHES:
+        _CACHES[root] = RunCache(LocalStorage(root))
+    return _CACHES[root]
 
 
 class Study(BaseModel):
@@ -68,7 +79,7 @@ def optimise_router(config_path: Path, root: Path) -> APIRouter:
         with lock:
             folder = root / "latest"
             try:
-                result = optimise(problem, design, folder)
+                result = optimise(problem, design, folder, run_cache(root.parent))
             except ProblemError as error:
                 raise HTTPException(status_code=422, detail=str(error)) from error
             report = build_report(problem, result)
