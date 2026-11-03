@@ -310,6 +310,15 @@ Both web pages have an **Ask Syntera** panel. It sends questions to `/api/assist
 clicking a citation highlights it: a drawing entity is centred on the 2D sheet, a line
 is selected in the 3D workbench. The panel only displays what the server returns.
 
+The **Design** page (`/design`) lists every value of the current design with its source
+and reason. Tube sizes, clearances and routing parameters can be edited: **Preview**
+shows the before/after diff (`POST /api/design/preview`, nothing applied), **Apply**
+applies the change set as a new version and can route and verify it
+(`POST /api/design/apply`). Every version is kept under `<output>/design/` and any two
+can be compared (`GET /api/design/versions`, `/api/design/versions/{n}`,
+`/api/design/compare?a=&b=`). Routes and rationale records cannot be edited: they come
+from the pipeline and the rules.
+
 ```bash
 python -m syntera.cli assistant-eval
 ANTHROPIC_API_KEY=... python -m syntera.cli assistant-eval --mode anthropic
