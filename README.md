@@ -319,6 +319,13 @@ can be compared (`GET /api/design/versions`, `/api/design/versions/{n}`,
 `/api/design/compare?a=&b=`). Routes and rationale records cannot be edited: they come
 from the pipeline and the rules.
 
+**Make drawing sheet** on the Design page (`POST /api/sheets`) turns the latest routed
+workbench run into an ISO sheet (DXF, a PDF plotted at the sheet's size, and DWG when the
+ODA File Converter is installed) and files it in the drawings store, so it opens in the
+drawings viewer. `GET /api/sheets` lists sheets and `/api/sheets/{n}/{file}` downloads
+them; `/api/sheets/capabilities` says whether DWG is available. The workbench's route
+run now also writes `design.json` next to its other outputs.
+
 ```bash
 python -m syntera.cli assistant-eval
 ANTHROPIC_API_KEY=... python -m syntera.cli assistant-eval --mode anthropic

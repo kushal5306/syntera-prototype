@@ -112,5 +112,32 @@
     } catch (error) { $("compare-out").replaceChildren(make("p", { class: "verdict-fail" }, error.message)); }
   });
 
+  function sheetItem(sheet) {
+    const links = sheet.downloads.map((d) => make("a", { href: d.url, download: d.name }, d.name));
+    const item = make("li", {}, `Sheet ${sheet.id}${sheet.sheet ? ` (ISO ${sheet.sheet}, ${sheet.scale})` : ""}: `);
+    if (sheet.viewer) item.append(make("a", { href: sheet.viewer }, "view"), " · ");
+    links.forEach((link, i) => item.append(link, i < links.length - 1 ? " · " : ""));
+    return item;
+  }
+
+  async function renderSheets() {
+    const [sheets, caps] = await Promise.all([api("/api/sheets"), api("/api/sheets/capabilities")]);
+    $("sheet-caps").textContent = caps.dwg ? "DXF, PDF and DWG" : "DXF and PDF (DWG needs the ODA File Converter)";
+    $("sheets").replaceChildren(...sheets.map(sheetItem));
+  }
+
+  $("make-sheet").addEventListener("click", async () => {
+    $("make-sheet").disabled = true;
+    try {
+      await api("/api/sheets", {});
+      await renderSheets();
+    } catch (error) {
+      $("sheets").prepend(make("li", { class: "verdict-fail" }, error.message));
+    } finally {
+      $("make-sheet").disabled = false;
+    }
+  });
+
+  renderSheets().catch(() => {});
   load().catch((error) => { $("diff").replaceChildren(make("p", { class: "verdict-fail" }, error.message)); });
 })();
