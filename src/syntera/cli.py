@@ -85,6 +85,31 @@ def run_design(config_path: Path, output: Path) -> int:
     return 0
 
 
+def run_route_design(design_path: Path, output: Path) -> int:
+    """Route and verify every line of a design document, largest bore first."""
+    from syntera.design import load_design_input
+    from syntera.multiline import DESIGN_REPORT_FILE, route_design
+
+    report = route_design(load_design_input(design_path), output).report
+    print(f"Design: {report.title}")
+    print(f"Routing order: {', '.join(report.line_order)} ({report.order_rule})")
+    for line in report.lines:
+        status = "PASS" if line.overall_pass else "FAIL"
+        length = f"{line.route_length_mm:.1f} mm" if line.route_length_mm is not None else "-"
+        print(f"- {line.line}: {status}, {length}, {line.bends} bends")
+    for pair in report.pairs:
+        status = "PASS" if pair.passed else "FAIL"
+        print(
+            f"- {pair.lines[0]} / {pair.lines[1]}: {status}, "
+            f"{pair.minimum_distance_mm:.1f} mm apart ({pair.required_clearance_mm:g} required)"
+        )
+    print(f"Overall assurance: {'PASS' if report.overall_pass else 'FAIL'}")
+    for reason in report.failure_reasons:
+        print(f"- {reason}")
+    print(f"Report: {output / DESIGN_REPORT_FILE}")
+    return 0 if report.overall_pass else 2
+
+
 def run_drawing(source: Path, output: Path) -> int:
     """Convert (if DWG), read and render one drawing into ``output/<drawing_id>``."""
     from syntera.drawings.intake import SUMMARY_FILE, ingest_drawing
@@ -279,6 +304,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     design.add_argument("--config", type=Path, required=True)
     design.add_argument("--output", type=Path, required=True)
+    route_all = subparsers.add_parser(
+        "route-design", help="route and verify every line of a design, largest bore first"
+    )
+    route_all.add_argument(
+        "--design", type=Path, required=True, help="design.json document or YAML config"
+    )
+    route_all.add_argument("--output", type=Path, required=True)
     drawing = subparsers.add_parser(
         "drawing", help="convert a DWG/DXF drawing to DXF, an SVG view and a JSON summary"
     )
@@ -363,6 +395,8 @@ def main(argv: list[str] | None = None) -> int:
             return run_kpi1(args.log, args.baseline, args.output)
         if args.command == "design":
             return run_design(args.config, args.output)
+        if args.command == "route-design":
+            return run_route_design(args.design, args.output)
         if args.command == "drawing":
             return run_drawing(args.input, args.output)
         if args.command == "audit-step":
