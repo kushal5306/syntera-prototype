@@ -53,6 +53,19 @@ class AssistantQuestion(BaseModel):
     history: list[Turn] = Field(default_factory=list, max_length=20)
 
 
+class DesignRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    request: str = Field(min_length=1, max_length=2000)
+
+
+class Confirmation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    proposal_id: str = Field(pattern=r"^[0-9a-f]{12}$")
+    confirmed: bool
+
+
 class Citation(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -162,5 +175,36 @@ def assistant_router(
             "citations": [c.model_dump(mode="json") for c in citations(result)],
             "design_title": ctx.design.title,
         }
+
+    def provider_or_503() -> Provider:
+        provider = provider_factory()
+        if provider is None:
+            raise HTTPException(
+                status_code=503,
+                detail="No language model is configured: set ANTHROPIC_API_KEY on the server.",
+            )
+        return provider
+
+    @router.post("/design")
+    def design_request(body: DesignRequest) -> dict:
+        """Turn a request into proposed changes; nothing is applied."""
+        from syntera.assistant.design_flow import request_change
+
+        provider = provider_or_503()
+        with lock:
+            return request_change(provider, context(), body.request).model_dump(mode="json")
+
+    @router.post("/confirm")
+    def confirm(body: Confirmation) -> dict:
+        """The user's decision on a proposal: apply, regenerate and explain, or discard."""
+        from syntera.assistant.design_flow import confirm_change
+        from syntera.assistant.tools import ToolError
+
+        with lock:
+            try:
+                result = confirm_change(context(), body.proposal_id, body.confirmed)
+            except ToolError as error:
+                raise HTTPException(status_code=404, detail=str(error)) from error
+        return result.model_dump(mode="json")
 
     return router

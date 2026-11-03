@@ -54,6 +54,14 @@ class AssistantContext:
     history: list[DesignDocument] = field(default_factory=list)
     reports: list[Any] = field(default_factory=list)
     log: list[dict[str, Any]] = field(default_factory=list)
+    # Proposal ids the user confirmed through the interface (never set by a tool call).
+    user_confirmations: set[str] = field(default_factory=set)
+
+    def confirm(self, proposal_id: str) -> None:
+        """Record that the user (not the assistant) confirmed a proposal."""
+        if proposal_id not in self.proposals:
+            raise ToolError(f"unknown proposal {proposal_id}")
+        self.user_confirmations.add(proposal_id)
 
 
 # ---- inputs ------------------------------------------------------------------------------
@@ -296,12 +304,17 @@ def _apply(ctx: AssistantContext, call: ApplyChange) -> dict[str, Any]:
     proposal = ctx.proposals.get(call.proposal_id)
     if proposal is None:
         raise ToolError(f"unknown proposal {call.proposal_id}")
+    if call.proposal_id not in ctx.user_confirmations:
+        raise ToolError(
+            "the user has not confirmed this proposal in the interface; nothing was applied"
+        )
     if proposal.design_sha256 != design_sha256(ctx.design):
         raise ToolError("the design changed since this proposal; propose it again")
     changed, revert = apply_change_set(ctx.design, proposal.changes)
     ctx.history.append(ctx.design)
     ctx.design = changed
     del ctx.proposals[call.proposal_id]
+    ctx.user_confirmations.discard(call.proposal_id)
     return {"applied": True, "revert": revert.model_dump(mode="json"),
             "next": "run regenerate to route and verify the changed design"}  # fmt: skip
 
