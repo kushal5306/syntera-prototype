@@ -237,6 +237,18 @@ designs, flanges are obstacles for later lines and part of the pair checks.
 python -m syntera.cli demo --config examples/demo_skid_fittings.yaml --output outputs/fittings
 ```
 
+`isometrics` takes a routed `demo` or `route-design` folder (or a design with stored
+routes) and writes `bom.json` plus one `iso_<line>.dxf` per line. The bill of materials
+is derived from the design document: fittings placed as the pipeline places them,
+straight cut lengths, material from the line's analysis, and totals by item, size and
+material. Each isometric sheet shows the line's centreline in isometric projection with
+corner-to-corner run lengths, fitting marks and its BOM; every entity carries its
+`SYNTERA` reference. The BOM is a review take-off, not a purchasing document.
+
+```bash
+python -m syntera.cli isometrics --run outputs/fittings --output outputs/isometrics
+```
+
 `layout.dxf` is a general-arrangement drawing in millimetres: plan, front elevation and
 right elevation (third-angle) of the equipment, the nozzles and the routed tube drawn
 along its exact tangent/arc centreline at its outer diameter, with overall dimensions

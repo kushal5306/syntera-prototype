@@ -43,7 +43,7 @@ Status values: `todo`, `in-review` (PR open), `done` (merged), `blocked` (reason
 | 13 | E2 | Local retrieval | Knowledge | E1, D3 | done | [#36](https://github.com/kushal5306/syntera-prototype/pull/36) |
 | 14 | E3 | Deterministic explanation engine | Knowledge | E2 | done | [#37](https://github.com/kushal5306/syntera-prototype/pull/37) |
 | 15 | B2 | Standard component library | 3D engine | B1 | done | [#38](https://github.com/kushal5306/syntera-prototype/pull/38) |
-| 16 | C3 | Line isometrics and bill of materials | 2D drawings | B2, C2 | todo | |
+| 16 | C3 | Line isometrics and bill of materials | 2D drawings | B2, C2 | done | [#39](https://github.com/kushal5306/syntera-prototype/pull/39) |
 | 17 | B3 | Supports and spool splitting | 3D engine | B2 | todo | |
 | 18 | D4 | Round-trip DXF editing | DWG I/O | A4, D3 | todo | |
 | 19 | F1 | Assistant tool API | Intelligence | A4, D3, E3 | todo | |

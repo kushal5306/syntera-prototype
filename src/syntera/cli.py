@@ -319,6 +319,32 @@ def run_explain(args: argparse.Namespace) -> int:
     return 0
 
 
+def run_isometrics(run: Path, output: Path) -> int:
+    """One isometric sheet per routed line and a bill of materials from the design."""
+    from syntera.design import DESIGN_FILE, load_design_input
+    from syntera.drawings.isometric import (
+        BOM_FILE,
+        ISO_PREFIX,
+        bill_of_materials,
+        write_isometric,
+    )
+
+    source = run / DESIGN_FILE if run.is_dir() else run
+    design = load_design_input(source)
+    bom = bill_of_materials(design)
+    if not bom.lines:
+        raise ValueError(f"{source}: no routed lines; run demo or route-design first")
+    output.mkdir(parents=True, exist_ok=True)
+    write_json(bom, output / BOM_FILE)
+    for takeoff in bom.lines:
+        path = write_isometric(design, takeoff, output / f"{ISO_PREFIX}{takeoff.line}.dxf")
+        print(f"Isometric: {path}")
+    for row in bom.totals:
+        print(f"- {row.item}: {row.size} {row.material} x {row.quantity:g} {row.unit}")
+    print(f"Bill of materials: {output / BOM_FILE}")
+    return 0
+
+
 def run_drawing(source: Path, output: Path) -> int:
     """Convert (if DWG), read and render one drawing into ``output/<drawing_id>``."""
     from syntera.drawings.intake import SUMMARY_FILE, ingest_drawing
@@ -575,6 +601,11 @@ def build_parser() -> argparse.ArgumentParser:
     explain.add_argument("--flow", type=float, help="flow (m3/h) to back-calculate velocity")
     explain.add_argument("--wall", type=float, help="wall thickness (mm) for the bore")
     explain.add_argument("--mode", choices=["plain", "engineer"], default="plain")
+    isometrics = subparsers.add_parser(
+        "isometrics", help="line isometrics and a bill of materials for a routed design"
+    )
+    isometrics.add_argument("--run", type=Path, required=True, help="run folder or design.json")
+    isometrics.add_argument("--output", type=Path, required=True)
     drawing = subparsers.add_parser(
         "drawing", help="convert a DWG/DXF drawing to DXF, an SVG view and a JSON summary"
     )
@@ -677,6 +708,8 @@ def main(argv: list[str] | None = None) -> int:
             return run_search(args.query, args.design, args.graph, args.limit)
         if args.command == "explain":
             return run_explain(args)
+        if args.command == "isometrics":
+            return run_isometrics(args.run, args.output)
         if args.command == "drawing":
             return run_drawing(args.input, args.output)
         if args.command == "audit-step":
