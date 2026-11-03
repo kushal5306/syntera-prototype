@@ -273,6 +273,17 @@ and a proposal changes nothing until `apply_change` is called with `user_confirm
 Assistant change sets cannot write routes or rationale, set acceptance thresholds, or
 add analysis to a new line; those stay with the user.
 
+The agent loop (`syntera.assistant.agent.run_agent`) sends the conversation and the tool
+schemas to a provider, runs the tools it asks for, feeds the results back and stops at
+an answer or a step limit; the transcript is written as JSON lines. CI uses a scripted
+provider and never needs a key. The Anthropic provider is enabled only when
+`ANTHROPIC_API_KEY` is set (model from `SYNTERA_ANTHROPIC_MODEL`). An answer that talks
+about passing or failing when no check ran in the conversation gets a warning appended.
+
+```bash
+ANTHROPIC_API_KEY=... python -m syntera.cli ask --design examples/demo_skid_sized.yaml --question "Why is the pipe 20 mm?"
+```
+
 `layout.dxf` is a general-arrangement drawing in millimetres: plan, front elevation and
 right elevation (third-angle) of the equipment, the nozzles and the routed tube drawn
 along its exact tangent/arc centreline at its outer diameter, with overall dimensions

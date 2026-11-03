@@ -374,6 +374,24 @@ def run_assistant_tools() -> int:
     return 0
 
 
+def run_ask(design: Path, question: str, output: Path, max_steps: int) -> int:
+    """Ask the assistant about a design (needs ANTHROPIC_API_KEY for a real model)."""
+    from syntera.assistant.agent import TRANSCRIPT_FILE, provider_from_env, run_agent
+    from syntera.assistant.tools import AssistantContext
+    from syntera.design import load_design_input
+
+    provider = provider_from_env()
+    if provider is None:
+        print("No language model is configured: set ANTHROPIC_API_KEY to use ask.",
+              file=sys.stderr)  # fmt: skip
+        return 2
+    ctx = AssistantContext(design=load_design_input(design), output=output)
+    result = run_agent(provider, ctx, question, max_steps, transcript_path=output / TRANSCRIPT_FILE)
+    print(result.answer)
+    print(f"({result.stopped} after {result.steps} step(s); tools: {result.tool_calls})")
+    return 0 if result.stopped == "answer" else 2
+
+
 def run_drawing(source: Path, output: Path) -> int:
     """Convert (if DWG), read and render one drawing into ``output/<drawing_id>``."""
     from syntera.drawings.intake import SUMMARY_FILE, ingest_drawing
@@ -643,6 +661,11 @@ def build_parser() -> argparse.ArgumentParser:
     drawing_edit.add_argument("--output", type=Path, required=True)
     drawing_edit.add_argument("--dwg", action="store_true", help="also write DWG (needs ODA)")
     subparsers.add_parser("assistant-tools", help="print the assistant tool JSON schemas")
+    ask = subparsers.add_parser("ask", help="ask the assistant (needs ANTHROPIC_API_KEY)")
+    ask.add_argument("--design", type=Path, required=True)
+    ask.add_argument("--question", required=True)
+    ask.add_argument("--output", type=Path, default=Path("outputs/assistant"))
+    ask.add_argument("--max-steps", type=int, default=8)
     drawing = subparsers.add_parser(
         "drawing", help="convert a DWG/DXF drawing to DXF, an SVG view and a JSON summary"
     )
@@ -749,6 +772,8 @@ def main(argv: list[str] | None = None) -> int:
             return run_isometrics(args.run, args.output)
         if args.command == "drawing-edit":
             return run_drawing_edit(args.input, args.changes, args.output, args.dwg)
+        if args.command == "ask":
+            return run_ask(args.design, args.question, args.output, args.max_steps)
         if args.command == "assistant-tools":
             return run_assistant_tools()
         if args.command == "drawing":
