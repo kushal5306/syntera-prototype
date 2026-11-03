@@ -44,6 +44,7 @@ from syntera.web.audit import audit_router
 from syntera.web.design_api import design_router
 from syntera.web.drawings import drawings_router
 from syntera.web.mesh import scene_meshes
+from syntera.web.optimise import optimise_router
 from syntera.web.pid import pid_router
 from syntera.web.sheets import sheets_router
 
@@ -130,6 +131,7 @@ def create_app(
     app.include_router(audit_router(output_root / "audit"))
     app.include_router(design_router(config_path, output_root / "design"))
     app.include_router(sheets_router(output, output_root / "sheets", output_root / "drawings"))
+    app.include_router(optimise_router(config_path, output_root / "optimise"))
     app.include_router(
         assistant_router(config_path, output_root, assistant_provider or provider_from_env)
     )
@@ -151,6 +153,10 @@ def create_app(
     @app.get("/design", include_in_schema=False)
     def design_page() -> FileResponse:
         return FileResponse(static / "design.html")
+
+    @app.get("/optimise", include_in_schema=False)
+    def optimise_page() -> FileResponse:
+        return FileResponse(static / "optimise.html")
 
     @app.get("/drawings", include_in_schema=False)
     def drawings_page() -> FileResponse:

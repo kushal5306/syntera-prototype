@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Syntera Optimisation</title>
+    <link rel="stylesheet" href="/assets/styles.css">
+    <link rel="stylesheet" href="/assets/design.css">
+  </head>
+  <body>
+    <main class="design-page">
+      <header class="design-head">
+        <div><b>Syntera</b> · Optimisation</div>
+        <nav><a href="/">Workbench</a> · <a href="/design">Design</a> · <a href="/drawings">Drawings</a></nav>
+      </header>
+      <section aria-labelledby="study-h">
+        <h2 id="study-h">Study</h2>
+        <p class="muted">Every candidate is routed and verified; candidates that fail a check or a limit are rejected, never traded off.</p>
+        <textarea id="study" rows="14" spellcheck="false" aria-label="Optimisation study (JSON)" style="width:100%;font-family:monospace"></textarea>
+        <div class="actions"><button class="btn primary" id="run" type="button">Run study</button><span class="muted" id="status"></span></div>
+      </section>
+      <section aria-labelledby="result-h">
+        <h2 id="result-h">Pareto set</h2>
+        <div id="summary" class="muted"></div>
+        <div id="chart"></div>
+        <div id="table" class="diff"></div>
+        <h3>Sensitivity around the chosen design</h3>
+        <ul id="sensitivity" class="versions"></ul>
+      </section>
+    </main>
+    <script src="/assets/optimise.js"></script>
+  </body>
+</html>
