@@ -25,6 +25,7 @@ KNOWN_RULE_IDS: frozenset[str] = frozenset(
         "drawing.routing_weights_from_grid.v1",
         "drawing.sheet_and_scale.v1",
         "grid.finest_standard_step.v1",
+        "optimise.knee_point.v1",
         "pid.bend_radius_long_radius.v1",
         "pid.class_default_envelope.v1",
         "pid.clearance_half_od_min_25.v1",

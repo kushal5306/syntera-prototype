@@ -331,6 +331,24 @@ python -m syntera.cli assistant-eval
 ANTHROPIC_API_KEY=... python -m syntera.cli assistant-eval --mode anthropic
 ```
 
+### Optimisation
+
+An optimisation problem (`examples/demo_optimisation.yaml`) names variables (line size,
+bend radius factor, equipment position), minimised objectives (length, bends, cost,
+volume) and hard limits. `optimise` searches the variable grid in a fixed order
+(`grid`), by a seeded sample (`random`) or with a small Bayesian optimiser (`bayes`, a
+Gaussian-process surrogate with expected improvement after a seeded start). Every
+candidate is applied as a change set and fully routed and verified; a candidate that
+fails a check or a limit is rejected with its reasons, never penalised. Feasible
+candidates form a Pareto set, and the chosen design is the Pareto member with the
+smallest normalised objective sum (rule `optimise.knee_point.v1`). The same problem and
+seed always give the same `optimisation.json`. Peak stress needs solved FEA per
+candidate and is not supported by the optimiser yet.
+
+```bash
+python -m syntera.cli optimise --problem examples/demo_optimisation.yaml --output outputs/optimise
+```
+
 `layout.dxf` is a general-arrangement drawing in millimetres: plan, front elevation and
 right elevation (third-angle) of the equipment, the nozzles and the routed tube drawn
 along its exact tangent/arc centreline at its outer diameter, with overall dimensions

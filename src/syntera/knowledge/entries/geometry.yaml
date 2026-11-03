@@ -116,3 +116,21 @@
   citations:
     - kind: practice
       source: Shop prefabrication of piping spools sized for transport, with field welds on straight pipe
+
+- id: kb.practice.knee_point
+  kind: practice
+  title: Choosing one design from a Pareto set
+  summary: >-
+    When objectives conflict, Syntera keeps every verified design that no other beats on
+    all of them, then picks the one closest to the ideal after normalising each objective.
+  detail: >-
+    Each objective is scaled to 0 for the best and 1 for the worst value within the
+    Pareto set, and the design with the smallest sum is chosen, ties broken by candidate
+    id. Only candidates that passed every exact check and stated limit are considered;
+    failing candidates are rejected, never traded off.
+  rules: [optimise.knee_point.v1]
+  keywords: [optimisation, pareto, trade-off, knee point, objective]
+  synthetic: false
+  citations:
+    - kind: textbook
+      source: Multi-objective optimisation and Pareto optimality, in engineering design optimisation texts

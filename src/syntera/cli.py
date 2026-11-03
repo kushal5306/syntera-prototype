@@ -412,6 +412,28 @@ def run_assistant_eval(mode: str, output: Path) -> int:
     return 0 if report.passed == report.total else 2
 
 
+def run_optimise(problem_path: Path, output: Path) -> int:
+    """Seeded, verified optimisation: every candidate routed and checked; Pareto set."""
+    from syntera.optimise.optimiser import OPTIMISATION_FILE, optimise
+    from syntera.optimise.problem import load_problem
+
+    problem, design = load_problem(problem_path)
+    result = optimise(problem, design, output)
+    write_json(result, output / OPTIMISATION_FILE)
+    feasible = sum(e.feasible for e in result.evaluations)
+    searched = f"{result.evaluated} of {result.search_space} candidates evaluated"
+    print(f"{problem.title}: {searched} ({result.strategy}, seed {result.seed})")
+    print(f"{feasible} passed every check and limit")
+    for evaluation in result.evaluations:
+        if evaluation.id in result.pareto:
+            mark = " <- chosen" if evaluation.id == result.chosen else ""
+            values = ", ".join(f"{k}={v:g}" for k, v in evaluation.values.items())
+            found = ", ".join(f"{k} {v:g}" for k, v in (evaluation.objectives or {}).items())
+            print(f"- Pareto {evaluation.id}: {values} -> {found}{mark}")
+    print(f"Report: {output / OPTIMISATION_FILE}")
+    return 0 if result.chosen else 2
+
+
 def run_drawing(source: Path, output: Path) -> int:
     """Convert (if DWG), read and render one drawing into ``output/<drawing_id>``."""
     from syntera.drawings.intake import SUMMARY_FILE, ingest_drawing
@@ -691,6 +713,11 @@ def build_parser() -> argparse.ArgumentParser:
     ask.add_argument("--question", required=True)
     ask.add_argument("--output", type=Path, default=Path("outputs/assistant"))
     ask.add_argument("--max-steps", type=int, default=8)
+    optimising = subparsers.add_parser(
+        "optimise", help="seeded optimisation where every candidate is routed and verified"
+    )
+    optimising.add_argument("--problem", type=Path, required=True)
+    optimising.add_argument("--output", type=Path, required=True)
     drawing = subparsers.add_parser(
         "drawing", help="convert a DWG/DXF drawing to DXF, an SVG view and a JSON summary"
     )
@@ -803,6 +830,8 @@ def main(argv: list[str] | None = None) -> int:
             return run_assistant_eval(args.mode, args.output)
         if args.command == "assistant-tools":
             return run_assistant_tools()
+        if args.command == "optimise":
+            return run_optimise(args.problem, args.output)
         if args.command == "drawing":
             return run_drawing(args.input, args.output)
         if args.command == "audit-step":
