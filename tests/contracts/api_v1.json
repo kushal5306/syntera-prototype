@@ -1,0 +1,246 @@
+{
+  "version": "v1",
+  "endpoints": [
+    {
+      "method": "POST",
+      "path": "/api/v1/assistant"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/assistant/confirm"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/assistant/design"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/assistant/status"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/audit"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/audit/{audit_id}/audit.json"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/capabilities"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/config"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/design"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/design/apply"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/design/compare"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/design/preview"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/design/versions"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/design/versions/{number}"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/download/{filename}"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/drawings"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/drawings"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/drawings/capabilities"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/drawings/{drawing_id}/assembly"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/drawings/{drawing_id}/assembly/{line}/{name}"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/drawings/{drawing_id}/assembly/{name}"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/drawings/{drawing_id}/{name}"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/health"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/jobs"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/jobs"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/jobs/{job_id}"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/kpi1"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/optimise"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/optimise"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/pid"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/pid/{plant_id}/{name}"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/pid/{plant_id}/{route}/{name}"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/preview"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/route"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/sheets"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/sheets"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/sheets/capabilities"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/sheets/{sheet_id}/{name}"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/time"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/time"
+    }
+  ],
+  "request_bodies": {
+    "POST /api/v1/assistant": [
+      "drawing_id",
+      "history",
+      "question"
+    ],
+    "POST /api/v1/assistant/confirm": [
+      "confirmed",
+      "proposal_id"
+    ],
+    "POST /api/v1/assistant/design": [
+      "request"
+    ],
+    "POST /api/v1/design/apply": [
+      "changes",
+      "regenerate"
+    ],
+    "POST /api/v1/design/preview": [
+      "changes"
+    ],
+    "POST /api/v1/drawings/{drawing_id}/assembly": [
+      "bend_radius_mm",
+      "clearance_mm",
+      "cost_per_bend",
+      "cost_per_metre",
+      "currency",
+      "equipment_height_mm",
+      "layer_roles",
+      "optimise",
+      "outer_diameter_mm",
+      "pipe_elevation_mm"
+    ],
+    "POST /api/v1/jobs": [
+      "kind",
+      "payload"
+    ],
+    "POST /api/v1/optimise": [
+      "budget",
+      "constraints",
+      "cost",
+      "objectives",
+      "seed",
+      "strategy",
+      "title",
+      "variables"
+    ],
+    "POST /api/v1/preview": [
+      "analysis",
+      "end_port",
+      "fittings",
+      "obstacles",
+      "routing_cost_weights",
+      "start_port",
+      "supports",
+      "synthetic_data",
+      "title",
+      "tube",
+      "voxel_resolution",
+      "workspace"
+    ],
+    "POST /api/v1/route": [
+      "analysis",
+      "end_port",
+      "fittings",
+      "obstacles",
+      "routing_cost_weights",
+      "start_port",
+      "supports",
+      "synthetic_data",
+      "title",
+      "tube",
+      "voxel_resolution",
+      "workspace"
+    ],
+    "POST /api/v1/time": [
+      "event",
+      "note",
+      "phase",
+      "task"
+    ]
+  }
+}
