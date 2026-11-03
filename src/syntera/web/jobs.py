@@ -11,6 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from syntera.design import DESIGN_FILE, DesignDocument, load_design, load_design_input
 from syntera.jobs import InProcessQueue, JobError, JobQueue
+from syntera.web.optimise import run_cache
 
 
 class JobRequest(BaseModel):
@@ -32,10 +33,11 @@ def current_design(config_path: Path, design_root: Path) -> DesignDocument:
 
 def make_handlers(config_path: Path, output_root: Path) -> dict:
     def route_design_job(payload: dict, folder: Path) -> dict:
-        from syntera.multiline import route_design
-
-        run = route_design(current_design(config_path, output_root / "design"), folder)
+        run = run_cache(output_root).route_design(
+            current_design(config_path, output_root / "design"), folder
+        )
         return {
+            "cached": run.hit,
             "overall_pass": run.report.overall_pass,
             "lines": {line.line: line.overall_pass for line in run.report.lines},
             "failure_reasons": run.report.failure_reasons,
@@ -53,7 +55,8 @@ def make_handlers(config_path: Path, output_root: Path) -> dict:
         problem = OptimisationProblem(design=str(config_path), **study.model_dump())
         design = load_design_input(config_path)
         check_problem(problem, design)
-        return build_report(problem, optimise(problem, design, folder)).model_dump(mode="json")
+        result = optimise(problem, design, folder, run_cache(output_root))
+        return build_report(problem, result).model_dump(mode="json")
 
     def fea_job(payload: dict, folder: Path) -> dict:
         from syntera.analysis.calculix import MANIFEST_FILE, input_sha256
