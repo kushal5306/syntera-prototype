@@ -1,0 +1,59 @@
+- id: kb.practice.pid_layout
+  kind: practice
+  title: Proposed layouts from P&IDs
+  summary: >-
+    A P&ID shows connections, not positions, so Syntera proposes equipment sizes and
+    places them on a grid; every size and position is a stated assumption.
+  detail: >-
+    Sizes come from P&ID attributes where present (diameter from capacity and length,
+    shell from tube length, plate pack allowance), else from class defaults. Equipment is
+    placed on a grid and improved by swaps that shorten straight-line pipe length, inside
+    a skid workspace with access gaps. Nominal sizes map to outside diameters.
+  rules:
+    - pid.outside_diameter_from_nominal_size.v1
+    - pid.class_default_envelope.v1
+    - pid.vessel_diameter_from_capacity.v1
+    - pid.shell_from_tube_length.v1
+    - pid.plate_frame_allowance.v1
+    - pid.grid_placement_swaps.v1
+    - pid.skid_workspace.v1
+  keywords: [P&ID, DEXPI, layout, placement, equipment size]
+  synthetic: false
+  citations:
+    - kind: standard
+      source: DEXPI exchange format for P&ID data (structure only)
+    - kind: practice
+      source: Outside diameters by nominal size as listed in common pipe dimension tables
+
+- id: kb.practice.drawing_scale
+  kind: practice
+  title: Sheet size and drawing scale
+  summary: >-
+    Generated sheets use ISO A sizes and standard ISO scales, choosing the smallest
+    sheet on which the views fit at a readable scale.
+  detail: >-
+    Syntera tries A3, A2, A1 and A0 in turn and takes the largest standard scale no
+    smaller than 1:10 that fits; if none does, it falls back to the smallest sheet that
+    fits at all. Dimension text always shows true model lengths.
+  rules: [drawing.sheet_and_scale.v1]
+  keywords: [sheet, scale, ISO, title block, drawing]
+  synthetic: false
+  citations:
+    - kind: standard
+      source: ISO 216 paper sizes and ISO 5455 recommended drawing scales (sizes and ratios only)
+
+- id: kb.check.exact_geometry
+  kind: check
+  title: Assurance comes from exact geometry checks
+  summary: >-
+    A design passes only when deterministic checks on the exact CAD solids pass:
+    no collisions, measured clearance, measured bend radius and port alignment.
+  detail: >-
+    The routing grid is an approximation, so every route is rebuilt as an exact solid and
+    measured with OpenCascade. Rules and knowledge explain values; they never set a
+    verdict, and an AI assistant may propose changes but never issue a pass.
+  keywords: [assurance, verification, clearance, collision, bend radius, verdict]
+  synthetic: false
+  citations:
+    - kind: practice
+      source: Syntera decision record on deterministic, independent verification

@@ -1,0 +1,98 @@
+# Knowledge entries for the line-sizing rules (syntera.rules). Written in Syntera's own
+# words; citations name where the idea comes from without quoting it.
+- id: kb.rule.maximum_velocity
+  kind: rule
+  title: Maximum flow velocity by medium
+  summary: >-
+    Each medium has a velocity limit; a line is sized so the flow stays at or below it.
+    Faster flow means more pressure drop, noise and erosion.
+  detail: >-
+    The limit is looked up from a small table keyed by medium (water, oil, air, steam).
+    Liquids get low limits because their density makes pressure drop and erosion rise
+    quickly with speed; gases and steam tolerate much higher velocities. Syntera's table
+    is synthetic demonstration data and must be replaced by the user's design basis.
+  rules: [rules.maximum_velocity_by_medium.v1]
+  keywords: [velocity, medium, erosion, pressure drop, sizing]
+  synthetic: true
+  citations:
+    - kind: practice
+      source: Common process-piping practice of capping line velocity per fluid service
+    - kind: synthetic
+      source: Syntera synthetic medium table v1
+      note: Values are invented and not taken from any code or company standard.
+
+- id: kb.rule.continuity
+  kind: rule
+  title: Bore and velocity from flow (continuity)
+  summary: >-
+    Velocity equals volumetric flow divided by the bore area, so the smallest bore that
+    keeps velocity under the limit follows directly from the flow.
+  detail: >-
+    For incompressible flow, velocity v = Q / A with bore area A = pi d^2 / 4. Rearranged,
+    the minimum inner diameter is d = sqrt(4 Q / (pi v_max)). Syntera converts flow from
+    m3/h to m3/s and reports diameters in millimetres. The same relation back-calculates
+    the actual velocity once a standard tube has been chosen.
+  rules:
+    - rules.minimum_inner_diameter_from_velocity.v1
+    - rules.flow_velocity_from_flow_and_bore.v1
+  keywords: [continuity, flow, bore, inner diameter, velocity]
+  synthetic: false
+  citations:
+    - kind: textbook
+      source: Continuity equation for incompressible flow, in any introductory fluid mechanics text
+
+- id: kb.rule.hoop_stress_wall
+  kind: rule
+  title: Minimum wall thickness from pressure (thin-wall hoop stress)
+  summary: >-
+    The wall must be thick enough that the hoop stress from internal pressure stays
+    within the allowable stress; a corrosion allowance is added on top.
+  detail: >-
+    Syntera uses the thin-wall hoop-stress relation often called Barlow's formula:
+    t = P D / (2 S E) + c, with design pressure P, outside diameter D, allowable stress
+    S, joint efficiency E and corrosion allowance c. It is a simple screening formula; a
+    real design must use the thickness equation and allowances of the governing code.
+  rules: [rules.wall_thickness_hoop_stress.v1]
+  keywords: [wall thickness, pressure, hoop stress, barlow, corrosion allowance]
+  synthetic: false
+  citations:
+    - kind: textbook
+      source: Thin-walled pressure vessel theory (hoop stress), in strength-of-materials texts
+    - kind: practice
+      source: Pressure-piping codes give their own wall-thickness equations; consult the governing one
+
+- id: kb.rule.allowable_stress
+  kind: rule
+  title: Allowable stress from yield strength
+  summary: >-
+    When no tabulated allowable stress is available, Syntera divides the yield strength
+    by a safety factor to get a conservative allowable stress.
+  detail: >-
+    Allowable stress S = yield strength / safety factor. The factor is an input, not a
+    constant of nature; design codes tabulate allowable stresses by material and
+    temperature, and those values should replace this estimate in real work.
+  rules: [rules.allowable_stress_from_yield.v1]
+  keywords: [allowable stress, yield, safety factor]
+  synthetic: false
+  citations:
+    - kind: textbook
+      source: Working-stress design with a factor of safety on yield, in machine-design texts
+
+- id: kb.rule.standard_tube
+  kind: rule
+  title: Smallest standard tube that meets bore and wall
+  summary: >-
+    Syntera picks the smallest stocked tube whose bore meets the minimum and whose wall
+    meets the pressure requirement, so lines are not oversized.
+  detail: >-
+    Tube sizes are scanned in ascending outside diameter; for each size the thinnest
+    stocked wall that meets the minimum wall is tried, and the first size whose
+    resulting bore is at least the minimum bore is chosen. The size table is synthetic.
+  rules: [rules.tube_size_from_flow.v1]
+  keywords: [tube size, outside diameter, standard size, catalogue]
+  synthetic: true
+  citations:
+    - kind: practice
+      source: Selecting the next standard size up from a calculated minimum
+    - kind: synthetic
+      source: Syntera synthetic tube size table v1

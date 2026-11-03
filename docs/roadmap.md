@@ -39,7 +39,7 @@ Status values: `todo`, `in-review` (PR open), `done` (merged), `blocked` (reason
 | 9 | C4 | Drawing-to-model traceability | 2D drawings | C2 | done | [#32](https://github.com/kushal5306/syntera-prototype/pull/32) |
 | 10 | D2 | Richer drawing reading | DWG I/O | - | done | [#33](https://github.com/kushal5306/syntera-prototype/pull/33) |
 | 11 | D3 | Semantic drawing graph | DWG I/O | D2 | done | [#34](https://github.com/kushal5306/syntera-prototype/pull/34) |
-| 12 | E1 | Knowledge store | Knowledge | A2a | todo | |
+| 12 | E1 | Knowledge store | Knowledge | A2a | done | [#35](https://github.com/kushal5306/syntera-prototype/pull/35) |
 | 13 | E2 | Local retrieval | Knowledge | E1, D3 | todo | |
 | 14 | E3 | Deterministic explanation engine | Knowledge | E2 | todo | |
 | 15 | B2 | Standard component library | 3D engine | B1 | todo | |

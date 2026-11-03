@@ -1,0 +1,39 @@
+- id: kb.material.stainless_316
+  kind: material
+  title: Stainless steel 316 (synthetic properties)
+  summary: >-
+    Austenitic stainless steel chosen for water and steam service in the demo tables for
+    its corrosion resistance; properties are rounded demonstration values.
+  detail: >-
+    Syntera's table gives 316 an elastic modulus near 193 GPa, yield near 205 MPa and a
+    thermal expansion near 16e-6 per K. The allowable stresses by temperature band are
+    invented for the demonstration and fall as temperature rises, as real tables do.
+  rules: [rules.material_by_medium_temperature.v1]
+  materials: [stainless_316]
+  keywords: [stainless, "316", corrosion, water, steam]
+  synthetic: true
+  citations:
+    - kind: practice
+      source: Typical published room-temperature properties of type 316 stainless steel
+    - kind: synthetic
+      source: Syntera synthetic material bands v1
+
+- id: kb.material.carbon_steel
+  kind: material
+  title: Carbon steel (synthetic properties)
+  summary: >-
+    Carbon steel chosen for oil and air service in the demo tables, where corrosion is
+    less of a concern; properties are rounded demonstration values.
+  detail: >-
+    Syntera's table gives carbon steel an elastic modulus near 200 GPa, yield near
+    240 MPa and a thermal expansion near 12e-6 per K. Temperature bands and allowable
+    stresses are invented demonstration data.
+  rules: [rules.material_by_medium_temperature.v1]
+  materials: [carbon_steel]
+  keywords: [carbon steel, oil, air]
+  synthetic: true
+  citations:
+    - kind: practice
+      source: Typical published room-temperature properties of carbon steel pipe grades
+    - kind: synthetic
+      source: Syntera synthetic material bands v1

@@ -192,6 +192,16 @@ edge or dimension resolves to its line, nozzle or equipment
 python -m syntera.cli sheet --run outputs/demo --output outputs/sheet
 ```
 
+The knowledge store (`src/syntera/knowledge/entries/*.yaml`) explains every rule,
+material and practice Syntera uses, in its own words, with citations that name where
+each idea comes from without quoting it. Every rule id written into a rationale record
+links to an entry (a test scans the code to keep this true), entries for synthetic
+tables say so, and long quotations are refused by the loader.
+
+```bash
+python -m syntera.cli knowledge --id kb.rule.hoop_stress_wall
+```
+
 `layout.dxf` is a general-arrangement drawing in millimetres: plan, front elevation and
 right elevation (third-angle) of the equipment, the nozzles and the routed tube drawn
 along its exact tangent/arc centreline at its outer diameter, with overall dimensions
