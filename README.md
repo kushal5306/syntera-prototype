@@ -138,6 +138,20 @@ larger clearance). Outputs: `lines/<id>/` per line, `design.json` with every rou
 python -m syntera.cli route-design --design examples/demo_three_lines.design.json --output outputs/three-lines
 ```
 
+A change set (`changes.json`) edits a design with typed operations: `set_parameter`
+(a path such as `lines.main.tube.minimum_clearance` or `parameters.voxel_resolution`; ids,
+references, provenance and outputs cannot be set), `move_equipment` (its nozzles move
+with it), `add_line` and `remove_line`. The whole result is validated as a design, set
+values get a `user` rationale record, and stored routes are cleared. `change` writes the
+new `design.json`, `revert_changes.json` (which restores the original byte for byte) and
+`design_diff.json` (changed values and rationale). With `--regenerate` it routes and
+verifies the design before and after and lists every check whose verdict changed. A
+change set edits inputs only; verdicts always come from the deterministic checks.
+
+```bash
+python -m syntera.cli change --design examples/demo_skid.yaml --changes examples/demo_skid.changes.json --output outputs/changed --regenerate
+```
+
 `layout.dxf` is a general-arrangement drawing in millimetres: plan, front elevation and
 right elevation (third-angle) of the equipment, the nozzles and the routed tube drawn
 along its exact tangent/arc centreline at its outer diameter, with overall dimensions

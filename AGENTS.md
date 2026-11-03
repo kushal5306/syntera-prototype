@@ -15,6 +15,7 @@ python -m syntera.cli demo --config examples/demo_skid.yaml --output outputs/dem
 python -m syntera.cli design --config examples/demo_skid_sized.yaml --output outputs/design
 python -m syntera.cli demo --config outputs/design/design.json --output outputs/from-design
 python -m syntera.cli route-design --design examples/demo_three_lines.design.json --output outputs/three-lines
+python -m syntera.cli change --design examples/demo_skid.yaml --changes examples/demo_skid.changes.json --output outputs/changed --regenerate
 python -m syntera.cli fea-evaluate --config examples/demo_skid.yaml --output outputs/demo
 python -m syntera.cli compare --baseline examples/baseline_skid.yaml --output outputs/demo
 python -m syntera.cli kpi1 --log outputs/time_log.jsonl --baseline examples/manual_baseline.yaml --output outputs/demo

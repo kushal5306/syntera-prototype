@@ -110,6 +110,47 @@ def run_route_design(design_path: Path, output: Path) -> int:
     return 0 if report.overall_pass else 2
 
 
+def run_change(design_path: Path, changes_path: Path, output: Path, regenerate: bool) -> int:
+    """Apply a change set to a design; write the new design, its revert and a diff."""
+    from syntera.changes import (
+        DIFF_FILE,
+        REVERT_FILE,
+        ChangeSet,
+        apply_change_set,
+        diff_designs,
+        verdict_changes,
+    )
+    from syntera.design import DESIGN_FILE, load_design_input, save_design
+    from syntera.multiline import route_design
+
+    before = load_design_input(design_path)
+    changes = ChangeSet.model_validate_json(changes_path.read_text(encoding="utf-8"))
+    after, revert = apply_change_set(before, changes)
+    output.mkdir(parents=True, exist_ok=True)
+    save_design(after, output / DESIGN_FILE)
+    write_json(revert, output / REVERT_FILE)
+    diff = diff_designs(before, after)
+    status = 0
+    if regenerate:
+        old = route_design(before, output / "before").report
+        new = route_design(after, output / "after").report
+        diff = diff.model_copy(update={"verdicts": verdict_changes(old, new), "regenerated": True})
+        status = 0 if new.overall_pass else 2
+    write_json(diff, output / DIFF_FILE)
+    print(f"Applied: {changes.description} ({len(changes.edits)} edit(s))")
+    for change in diff.values:
+        print(f"- {change.path}: {change.before!r} -> {change.after!r}")
+    print(f"Rationale records changed: {len(diff.rationale)}")
+    if regenerate:
+        for verdict in diff.verdicts:
+            print(f"- verdict {verdict.check}: {verdict.before} -> {verdict.after}")
+        if not diff.verdicts:
+            print("No check changed verdict")
+    print(f"Design: {output / DESIGN_FILE}; revert: {output / REVERT_FILE}")
+    print(f"Diff: {output / DIFF_FILE}")
+    return status
+
+
 def run_drawing(source: Path, output: Path) -> int:
     """Convert (if DWG), read and render one drawing into ``output/<drawing_id>``."""
     from syntera.drawings.intake import SUMMARY_FILE, ingest_drawing
@@ -311,6 +352,17 @@ def build_parser() -> argparse.ArgumentParser:
         "--design", type=Path, required=True, help="design.json document or YAML config"
     )
     route_all.add_argument("--output", type=Path, required=True)
+    change = subparsers.add_parser(
+        "change", help="apply a change set to a design and report the diff"
+    )
+    change.add_argument("--design", type=Path, required=True)
+    change.add_argument("--changes", type=Path, required=True)
+    change.add_argument("--output", type=Path, required=True)
+    change.add_argument(
+        "--regenerate",
+        action="store_true",
+        help="route and verify the design before and after, and report changed verdicts",
+    )
     drawing = subparsers.add_parser(
         "drawing", help="convert a DWG/DXF drawing to DXF, an SVG view and a JSON summary"
     )
@@ -397,6 +449,8 @@ def main(argv: list[str] | None = None) -> int:
             return run_design(args.config, args.output)
         if args.command == "route-design":
             return run_route_design(args.design, args.output)
+        if args.command == "change":
+            return run_change(args.design, args.changes, args.output, args.regenerate)
         if args.command == "drawing":
             return run_drawing(args.input, args.output)
         if args.command == "audit-step":
