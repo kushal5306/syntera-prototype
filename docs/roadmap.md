@@ -51,7 +51,7 @@ Status values: `todo`, `in-review` (PR open), `done` (merged), `blocked` (reason
 | 21 | F3 | Drawing and design Q&A endpoint | Intelligence | F2 | done | [#44](https://github.com/kushal5306/syntera-prototype/pull/44) |
 | 22 | F5 | Assistant evaluation suite | Intelligence | F3 | done | [#45](https://github.com/kushal5306/syntera-prototype/pull/45) |
 | 23 | F4 | Prompt-to-design with confirmation | Intelligence | F3, B1 | done | [#46](https://github.com/kushal5306/syntera-prototype/pull/46) |
-| 24 | G1 | Assistant panel in the web app | Web | F3 | todo | |
+| 24 | G1 | Assistant panel in the web app | Web | F3 | done | [#47](https://github.com/kushal5306/syntera-prototype/pull/47) |
 | 25 | G2 | Parameter editing with diff view | Web | A4 | todo | |
 | 26 | G3 | Generated sheet viewer and downloads | Web | C2, D1 | todo | |
 | 27 | G4 | Design history | Web | A4 | todo | |
