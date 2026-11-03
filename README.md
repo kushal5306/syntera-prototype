@@ -172,6 +172,19 @@ with the solid they came from, and written to `views.dxf` with visible edges on
 python -m syntera.cli project --step outputs/demo/routed_assembly.step --output outputs/views
 ```
 
+`sheet` turns a `demo` or `route-design` output folder into an ISO drawing sheet:
+`sheet.dxf` with frame, title block, the four hidden-line views and dimensions (overall
+size of each orthographic view, nozzle positions from the model origin in plan, and
+centreline run lengths in plan), plus `sheet.json` recording every decision. The sheet
+is the smallest of A3, A2, A1, A0 on which the views fit at an ISO 5455 scale no smaller
+than 1:10, at the largest such scale (rule `drawing.sheet_and_scale.v1`). The title block
+repeats the verdict from the run's report and states that the sheet is a review drawing,
+not evidence.
+
+```bash
+python -m syntera.cli sheet --run outputs/demo --output outputs/sheet
+```
+
 `layout.dxf` is a general-arrangement drawing in millimetres: plan, front elevation and
 right elevation (third-angle) of the equipment, the nozzles and the routed tube drawn
 along its exact tangent/arc centreline at its outer diameter, with overall dimensions
