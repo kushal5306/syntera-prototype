@@ -53,7 +53,7 @@ Status values: `todo`, `in-review` (PR open), `done` (merged), `blocked` (reason
 | 23 | F4 | Prompt-to-design with confirmation | Intelligence | F3, B1 | done | [#46](https://github.com/kushal5306/syntera-prototype/pull/46) |
 | 24 | G1 | Assistant panel in the web app | Web | F3 | done | [#47](https://github.com/kushal5306/syntera-prototype/pull/47) |
 | 25 | G2 | Parameter editing with diff view | Web | A4 | done | [#48](https://github.com/kushal5306/syntera-prototype/pull/48) |
-| 26 | G3 | Generated sheet viewer and downloads | Web | C2, D1 | todo | |
+| 26 | G3 | Generated sheet viewer and downloads | Web | C2, D1 | done | [#49](https://github.com/kushal5306/syntera-prototype/pull/49) |
 | 27 | G4 | Design history | Web | A4 | done | [#48](https://github.com/kushal5306/syntera-prototype/pull/48) |
 | 28 | H1 | Optimisation problem schema | Optimisation | A4 | todo | |
 | 29 | H2 | Verified optimiser | Optimisation | H1 | todo | |

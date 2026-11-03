@@ -16,7 +16,15 @@ from syntera.analysis.calculix import input_sha256
 from syntera.analysis.fields import parse_case_fields, parse_mesh_inp, solve_decks
 from syntera.analysis.results import evaluate_acceptance
 from syntera.assistant.agent import provider_from_env
-from syntera.design import load_run, rationale_still_applies
+from syntera.design import (
+    DESIGN_FILE,
+    MAIN_LINE,
+    design_from_config,
+    load_run,
+    rationale_still_applies,
+    save_design,
+    with_route,
+)
 from syntera.geometry.cad import assembly_shapes
 from syntera.geometry.step_import import StepImportError
 from syntera.pipeline import PipelineResult, execute_pipeline
@@ -37,6 +45,7 @@ from syntera.web.design_api import design_router
 from syntera.web.drawings import drawings_router
 from syntera.web.mesh import scene_meshes
 from syntera.web.pid import pid_router
+from syntera.web.sheets import sheets_router
 
 DOWNLOADS = {
     "assembly.step",
@@ -120,6 +129,7 @@ def create_app(
     app.include_router(pid_router(output_root / "pid"))
     app.include_router(audit_router(output_root / "audit"))
     app.include_router(design_router(config_path, output_root / "design"))
+    app.include_router(sheets_router(output, output_root / "sheets", output_root / "drawings"))
     app.include_router(
         assistant_router(config_path, output_root, assistant_provider or provider_from_env)
     )
@@ -186,6 +196,10 @@ def create_app(
                     sizing = []  # edited in the browser: the edited values are the user's
                 sizing = rationale_still_applies(config, sizing)
                 result = execute_pipeline(checked(config), output, rationale=sizing)
+                save_design(
+                    with_route(design_from_config(config, sizing), MAIN_LINE, result.route),
+                    output / DESIGN_FILE,
+                )
             except StepImportError as error:
                 raise HTTPException(status_code=422, detail=str(error)) from error
             finally:
