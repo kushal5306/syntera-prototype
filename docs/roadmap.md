@@ -26,8 +26,9 @@ Status values: `todo`, `in-review` (PR open), `done` (merged), `blocked` (reason
 
 | # | ID | Milestone | Layer | Depends on | Status | PR |
 |---|----|-----------|-------|------------|--------|----|
-| 1 | A1 | Rationale schema | Design model | - | in-review | [#19](https://github.com/kushal5306/syntera-prototype/pull/19) |
-| 2 | A2 | Deterministic engineering rule library | Design model | A1 | todo | |
+| 1 | A1 | Rationale schema | Design model | - | done | [#19](https://github.com/kushal5306/syntera-prototype/pull/19) |
+| 2a | A2a | Deterministic engineering rule library: rules, tables, config sizing | Design model | A1 | in-review | [#22](https://github.com/kushal5306/syntera-prototype/pull/22) |
+| 2b | A2b | Demo, compare and web runs size a line from flow | Design model | A2a | todo | |
 | 3 | A3 | Canonical design document | Design model | A1 | todo | |
 | 4 | B1 | Multi-line design from the design document | 3D engine | A3 | todo | |
 | 5 | A4 | Change sets and design diff | Design model | A3 | todo | |
@@ -37,7 +38,7 @@ Status values: `todo`, `in-review` (PR open), `done` (merged), `blocked` (reason
 | 9 | C4 | Drawing-to-model traceability | 2D drawings | C2 | todo | |
 | 10 | D2 | Richer drawing reading | DWG I/O | - | todo | |
 | 11 | D3 | Semantic drawing graph | DWG I/O | D2 | todo | |
-| 12 | E1 | Knowledge store | Knowledge | A2 | todo | |
+| 12 | E1 | Knowledge store | Knowledge | A2a | todo | |
 | 13 | E2 | Local retrieval | Knowledge | E1, D3 | todo | |
 | 14 | E3 | Deterministic explanation engine | Knowledge | E2 | todo | |
 | 15 | B2 | Standard component library | 3D engine | B1 | todo | |
@@ -81,6 +82,17 @@ bend radius and clearance rules, material choice from a medium/temperature table
 is a pure function returning a value plus its rationale. Tables are synthetic and say so.
 *Done when:* rules are versioned, unit-tested with hand-calculated cases, and the demo can
 size a line from flow instead of a fixed OD.
+
+Split into two parts:
+
+- **A2a** `syntera.rules`: versioned pure rules (minimum bore from velocity, flow velocity,
+  hoop-stress wall, smallest standard tube, long-radius bend, clearance, material by
+  medium and temperature, allowable stress from yield), synthetic tables, and
+  `sized_config()` that turns a `line_sizing` block into tube, wall and material values
+  with rationale (`examples/demo_skid_sized.yaml`). Unit-tested with hand calculations.
+- **A2b** wire `sized_config()` into `demo`, `compare`, `fea-evaluate` and the web app so
+  their rationale records reach `rationale.json`; integration test that the sized demo
+  routes, verifies and writes a deterministic `rationale.json` with the OD from a rule.
 
 **A3 Canonical design document.** A versioned `design.json`: equipment, nozzles, lines,
 routes, parameters, rationale and input hashes. Load, validate and save; CLI and web runs

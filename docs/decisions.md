@@ -38,3 +38,10 @@
     Callers that build a configuration (from a P&ID or a drawing) pass their own records,
     so a rule-chosen value is never reported as the user's. Records explain values and are
     never evidence for, or inputs to, an assurance verdict.
+16. **Rules propose values, never verdicts.** `syntera.rules` chooses design values (line
+    size, wall, bend radius, clearance, material) with pure, versioned functions that
+    return their rationale; changing a rule's behaviour bumps its id version. Values the
+    input states are kept; a stated value that breaks a rule's hard limit (a wall below
+    the hoop-stress minimum, two sources for one size) is refused, never overridden. Rule
+    tables are synthetic until licensed data is supplied, and acceptance still comes only
+    from the exact checks and FEA thresholds.
