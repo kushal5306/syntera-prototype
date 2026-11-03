@@ -28,6 +28,7 @@ from syntera.rules.line import LINE_SIZING_KEY, LineSizingSpec
 from syntera.schemas import (
     AnalysisSpecification,
     DemoConfig,
+    FittingSpec,
     Obstacle,
     Point3,
     Port,
@@ -88,6 +89,7 @@ class Line(StrictModel):
     tube: TubeSpecification
     line_sizing: LineSizingSpec | None = None
     analysis: AnalysisSpecification | None = None
+    fittings: FittingSpec | None = None
 
     @model_validator(mode="after")
     def ends_must_differ(self) -> Line:
@@ -270,6 +272,7 @@ def design_from_config(
                 tube=config.tube,
                 line_sizing=sizing,
                 analysis=config.analysis,
+                fittings=config.fittings,
             )
         ],
         parameters=DesignParameters(
@@ -322,6 +325,7 @@ def run_config(design: DesignDocument, line_id: str | None = None) -> DemoConfig
         voxel_resolution=design.parameters.voxel_resolution,
         routing_cost_weights=design.parameters.routing_cost_weights,
         analysis=line.analysis,
+        fittings=line.fittings,
     )
 
 

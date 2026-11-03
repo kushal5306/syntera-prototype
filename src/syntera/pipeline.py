@@ -11,6 +11,13 @@ from pathlib import Path
 import cadquery as cq
 
 from syntera.analysis.calculix import write_fea_inputs
+from syntera.components.fittings import (
+    FITTINGS_FILE,
+    FittingSet,
+    place_fittings,
+    verify_fittings,
+)
+from syntera.components.tables import TableError
 from syntera.geometry.cad import assembly_shapes, export_step, make_tube
 from syntera.geometry.step_import import import_step_obstacle
 from syntera.rationale import (
@@ -48,6 +55,7 @@ class PipelineResult:
     fea: FeaManifest | None = None
     metrics: PackageMetrics | None = None
     rationale: RationaleReport | None = None
+    fittings: FittingSet | None = None
 
 
 def execute_pipeline(
@@ -75,6 +83,7 @@ def execute_pipeline(
         "metrics.json",
         "layout.dxf",
         RATIONALE_FILE,
+        FITTINGS_FILE,
     ):
         (output / filename).unlink(missing_ok=True)
     shutil.rmtree(output / "fea", ignore_errors=True)
@@ -107,12 +116,18 @@ def execute_pipeline(
     write_json(route, output / "route.json")
     if create_preview:
         write_preview(config, route, output / "route_preview.png")
+    fittings = None
     if tube is None:
         report = failed_report(config, route, time.perf_counter() - started_at)
     else:
-        export_step([*assembly, tube], output / "routed_assembly.step")
         report = verify_route(config, route, tube, started_at)
+        parts: list[cq.Shape] = [tube]
+        if config.fittings is not None:
+            fittings, report, parts = _with_fittings(config, route, report)
+        export_step([*assembly, *parts], output / "routed_assembly.step")
     write_json(report, output / "assurance_report.json")
+    if fittings is not None:
+        write_json(fittings.report, output / FITTINGS_FILE)
     write_layout_dxf(config, route, report, output / "layout.dxf")
     metrics = package_metrics(config, assembly, tube, route.points)
     write_json(metrics, output / "metrics.json")
@@ -120,6 +135,7 @@ def execute_pipeline(
     if config.analysis is not None and report.overall_pass:
         fea = write_fea_inputs(config, route.points, output / "fea")
     return PipelineResult(
+        fittings=fittings,
         assembly=assembly,
         route=route,
         report=report,
@@ -128,3 +144,38 @@ def execute_pipeline(
         metrics=metrics,
         rationale=explained,
     )
+
+
+def _with_fittings(
+    config: DemoConfig, route: RouteResult, report: AssuranceReport
+) -> tuple[FittingSet | None, AssuranceReport, list[cq.Shape]]:
+    """Place and check the line's fittings; a failing fitting fails the assurance.
+
+    The routed STEP then holds the piping as built: straight pipe, elbows and flanges.
+    The single swept tube remains what the route checks measured.
+    """
+    assert config.fittings is not None
+    try:
+        placed = place_fittings(
+            route.points,
+            config.tube.outer_diameter,
+            config.tube.minimum_bend_radius,
+            config.fittings,
+            start_direction=config.start_port.direction,
+            end_direction=config.end_port.direction,
+        )
+    except (TableError, ValueError) as error:
+        reasons = [*report.failure_reasons, f"fittings could not be placed: {error}"]
+        failed = report.model_copy(update={"overall_pass": False, "failure_reasons": reasons})
+        return None, failed, []
+    checked = verify_fittings(config, placed)
+    placed.report = checked
+    if not checked.overall_pass:
+        reasons = [*report.failure_reasons, *checked.failure_reasons]
+        report = report.model_copy(update={"overall_pass": False, "failure_reasons": reasons})
+    pipes = [
+        make_tube([piece.start, piece.end], config.tube.outer_diameter / 2.0, 1.0)
+        for piece in checked.straight_pieces
+    ]
+    elbows = [placed.shapes[f.id] for f in checked.fittings if f.kind != "flange"]
+    return placed, report, [*pipes, *elbows, *placed.flanges]

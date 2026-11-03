@@ -165,6 +165,16 @@ class AnalysisSpecification(StrictModel):
         return self
 
 
+class FittingSpec(StrictModel):
+    """Fittings for a routed line: elbows at every bend, flanges at the ends if flanged.
+
+    Dimensions come from synthetic tables in ``syntera.components.tables``.
+    """
+
+    rating: Literal["PN16", "PN40"] = "PN16"
+    end_connection: Literal["flanged", "welded"] = "flanged"
+
+
 class DemoConfig(StrictModel):
     title: str = Field(min_length=1)
     synthetic_data: Literal[True]
@@ -176,6 +186,7 @@ class DemoConfig(StrictModel):
     voxel_resolution: PositiveMm
     routing_cost_weights: RoutingWeights = Field(default_factory=RoutingWeights)
     analysis: AnalysisSpecification | None = None
+    fittings: FittingSpec | None = None
 
     @model_validator(mode="after")
     def geometry_must_be_inside_workspace(self) -> DemoConfig:
