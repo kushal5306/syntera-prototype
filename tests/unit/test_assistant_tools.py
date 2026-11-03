@@ -115,6 +115,11 @@ def test_proposals_change_nothing_until_the_user_confirms(ctx):
     with pytest.raises(ToolError, match="not confirmed"):
         call_tool(ctx, "apply_change", {"proposal_id": pid, "user_confirmed": False})
     assert ctx.design is before
+    # the assistant claiming confirmation is not enough: the user must confirm
+    with pytest.raises(ToolError, match="not confirmed this proposal in the interface"):
+        call_tool(ctx, "apply_change", {"proposal_id": pid, "user_confirmed": True})
+    assert ctx.design is before
+    ctx.confirm(pid)
     applied = call_tool(ctx, "apply_change", {"proposal_id": pid, "user_confirmed": True})
     assert applied["applied"] is True
     assert ctx.design.line("main").tube.minimum_clearance == 25
@@ -130,7 +135,9 @@ def test_stale_proposals_are_refused(ctx):
     other = {"description": "grid", "edits": [
         {"op": "set_parameter", "path": "parameters.voxel_resolution", "value": 10}]}  # fmt: skip
     second = call_tool(ctx, "propose_change", {"changes": other})["proposal_id"]
+    ctx.confirm(second)
     call_tool(ctx, "apply_change", {"proposal_id": second, "user_confirmed": True})
+    ctx.confirm(first)
     with pytest.raises(ToolError, match="design changed since"):
         call_tool(ctx, "apply_change", {"proposal_id": first, "user_confirmed": True})
 

@@ -297,6 +297,14 @@ facts and citations. In CI a scripted provider calls each case's hinted tool and
 only from its result, so the suite checks the tools; `--mode anthropic` evaluates a real
 model. Results are reported per question in `assistant_eval.json`.
 
+Prompt-to-design: `POST /api/assistant/design` with `{"request"}` lets the assistant
+turn a request into proposed change sets and returns each proposal with its diff;
+nothing is applied. `POST /api/assistant/confirm` with `{"proposal_id", "confirmed"}`
+is the user's decision: a confirmed proposal is applied, the design is routed and
+verified by the deterministic pipeline, and the changed values are explained; a rejected
+one is discarded. `apply_change` refuses any proposal the user has not confirmed through
+the interface, even when the assistant claims confirmation.
+
 ```bash
 python -m syntera.cli assistant-eval
 ANTHROPIC_API_KEY=... python -m syntera.cli assistant-eval --mode anthropic
