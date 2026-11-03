@@ -48,7 +48,7 @@ Status values: `todo`, `in-review` (PR open), `done` (merged), `blocked` (reason
 | 18 | D4 | Round-trip DXF editing | DWG I/O | A4, D3 | done | [#41](https://github.com/kushal5306/syntera-prototype/pull/41) |
 | 19 | F1 | Assistant tool API | Intelligence | A4, D3, E3 | done | [#42](https://github.com/kushal5306/syntera-prototype/pull/42) |
 | 20 | F2 | LLM provider interface and agent loop | Intelligence | F1 | done | [#43](https://github.com/kushal5306/syntera-prototype/pull/43) |
-| 21 | F3 | Drawing and design Q&A endpoint | Intelligence | F2 | todo | |
+| 21 | F3 | Drawing and design Q&A endpoint | Intelligence | F2 | done | [#44](https://github.com/kushal5306/syntera-prototype/pull/44) |
 | 22 | F5 | Assistant evaluation suite | Intelligence | F3 | todo | |
 | 23 | F4 | Prompt-to-design with confirmation | Intelligence | F3, B1 | todo | |
 | 24 | G1 | Assistant panel in the web app | Web | F3 | todo | |
