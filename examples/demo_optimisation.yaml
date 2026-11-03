@@ -1,0 +1,22 @@
+# Synthetic optimisation problem over the demo skid (roadmap H). Every candidate is a
+# change set to the design, fully routed and checked; failing candidates are rejected.
+title: Demo skid bend radius and pump position
+design: demo_skid.yaml
+variables:
+  - kind: bend_radius_factor
+    line: main
+    low: 1.5
+    high: 2.5
+    step: 0.5
+  - kind: equipment_position
+    equipment: auxiliary-pump
+    axis: y
+    low: -20
+    high: 20
+    step: 20
+objectives: [length, bends, cost]
+constraints:
+  max_bends: 6
+strategy: grid
+seed: 7
+budget: 9
