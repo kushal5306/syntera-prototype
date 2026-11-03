@@ -175,6 +175,20 @@ class FittingSpec(StrictModel):
     end_connection: Literal["flanged", "welded"] = "flanged"
 
 
+class SupportSpec(StrictModel):
+    """Supports from a maximum-span rule and spools from a maximum length (synthetic defaults).
+
+    ``maximum_span_mm`` overrides the span calculated from the deflection limit; the span
+    rule needs the line's analysis (wall and material) when it is not given.
+    """
+
+    deflection_limit_mm: Annotated[float, Field(gt=0)] = 2.5
+    contents_density_tonne_per_mm3: Annotated[float, Field(ge=0)] = 1.0e-9
+    maximum_span_mm: PositiveMm | None = None
+    maximum_spool_length_mm: PositiveMm = 6000.0
+    cut_clearance_mm: Annotated[float, Field(ge=0)] = 50.0
+
+
 class DemoConfig(StrictModel):
     title: str = Field(min_length=1)
     synthetic_data: Literal[True]
@@ -187,6 +201,7 @@ class DemoConfig(StrictModel):
     routing_cost_weights: RoutingWeights = Field(default_factory=RoutingWeights)
     analysis: AnalysisSpecification | None = None
     fittings: FittingSpec | None = None
+    supports: SupportSpec | None = None
 
     @model_validator(mode="after")
     def geometry_must_be_inside_workspace(self) -> DemoConfig:
@@ -434,6 +449,8 @@ class FeaManifest(StrictModel):
     allowable_von_mises_mpa: float
     maximum_displacement_mm: float
     load_cases: list[FeaLoadCaseDeck] = Field(default_factory=list)
+    # Rest supports (centreline points) held vertically in every load case (B3).
+    supports: list[Point3] = Field(default_factory=list)
 
 
 class FeaCaseAcceptance(StrictModel):

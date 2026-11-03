@@ -36,6 +36,14 @@ class ShellMesh:
     axial_elements: int
     circumferential_elements: int
     maximum_aspect_ratio: float
+    # Corner-node rings: centreline point and node ids, for boundary conditions.
+    rings: tuple[tuple[Point3, tuple[int, ...]], ...] = ()
+
+    def ring_near(self, point: Point3) -> tuple[int, ...]:
+        """Node ids of the ring whose centreline point is nearest ``point`` (first on ties)."""
+        if not self.rings:
+            raise ValueError("mesh has no rings")
+        return min(self.rings, key=lambda ring: math.dist(ring[0], point))[1]
 
 
 @dataclass(frozen=True)
@@ -180,4 +188,8 @@ def mesh_tube(
         axial_elements=axial,
         circumferential_elements=circumferential,
         maximum_aspect_ratio=worst,
+        rings=tuple(
+            (stations[i].point, tuple(node(i, j) for j in range(ring_size)))
+            for i in range(0, len(stations), 2)
+        ),
     )

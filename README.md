@@ -249,6 +249,19 @@ corner-to-corner run lengths, fitting marks and its BOM; every entity carries it
 python -m syntera.cli isometrics --run outputs/fittings --output outputs/isometrics
 ```
 
+A `supports:` block places rest supports and splits spools by rule. The maximum span is
+given, or calculated so a simply supported span of pipe and contents sags no more than
+`deflection_limit_mm` (rule `rules.support_span_deflection.v1`). Supports go on straight
+runs, as far apart as that span allows, with the ends anchored at their ports. Spools are
+cut on straight runs, at most `maximum_spool_length_mm` long and `cut_clearance_mm` clear
+of every bend. `supports.json` records positions, spools and their rationale, and every
+CalculiX load case holds each support's node ring vertically. A line that cannot be
+supported within the span fails the assurance.
+
+```bash
+python -m syntera.cli demo --config examples/demo_skid_supports.yaml --output outputs/supports
+```
+
 `layout.dxf` is a general-arrangement drawing in millimetres: plan, front elevation and
 right elevation (third-angle) of the equipment, the nozzles and the routed tube drawn
 along its exact tangent/arc centreline at its outer diameter, with overall dimensions
