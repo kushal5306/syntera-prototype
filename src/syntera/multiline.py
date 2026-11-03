@@ -13,6 +13,7 @@ set from outside, and a line that fails is never traded against a shorter design
 
 from __future__ import annotations
 
+import math
 from collections.abc import Iterable
 from dataclasses import dataclass
 from itertools import combinations
@@ -21,6 +22,7 @@ from pathlib import Path
 import cadquery as cq
 from pydantic import BaseModel, ConfigDict
 
+from syntera.components.tables import flange_for
 from syntera.design import (
     DESIGN_FILE,
     DesignDocument,
@@ -145,18 +147,32 @@ def pipe_obstacles(
     return boxes
 
 
+def flange_envelope(line: Line) -> tuple[float, float]:
+    """Outside diameter and thickness of the line's end flanges, or (0, 0) if none."""
+    spec = line.fittings
+    if spec is None or spec.end_connection != "flanged":
+        return 0.0, 0.0
+    size = flange_for(line.tube.outer_diameter, spec.rating)
+    return size.outer_diameter, size.thickness
+
+
 def nozzle_reserve(
-    line_id: str, nozzle: Nozzle, tube: TubeSpecification, workspace: tuple[float, ...]
+    line_id: str,
+    nozzle: Nozzle,
+    tube: TubeSpecification,
+    workspace: tuple[float, ...],
+    flange: tuple[float, float] = (0.0, 0.0),
 ) -> BoxObstacle:
     """Space kept free at a nozzle of a line not yet routed.
 
     The box runs from the port along its direction for one bend radius plus one outside
-    diameter (the straight run before the first bend), with half-width of the outside
-    radius plus the line's clearance, clipped to the workspace.
+    diameter (the straight run before the first bend) plus any flange thickness, with
+    half-width of the outside radius (or flange radius) plus the line's clearance,
+    clipped to the workspace.
     """
     position, direction = nozzle.port.position, nozzle.port.direction
-    half = tube.outer_diameter / 2 + tube.minimum_clearance
-    reach = tube.minimum_bend_radius + tube.outer_diameter
+    half = max(tube.outer_diameter, flange[0]) / 2 + tube.minimum_clearance
+    reach = tube.minimum_bend_radius + tube.outer_diameter + flange[1]
     far = [position[i] + direction[i] * reach for i in range(3)]
     low, high = [], []
     for i in range(3):
@@ -181,16 +197,40 @@ def line_config(
     for other, points in routed:
         margin = max(0.0, other.tube.minimum_clearance - line.tube.minimum_clearance)
         extra.extend(pipe_obstacles(other.id, points, other.tube, margin))
+        extra.extend(flange_obstacles(other, points, margin))
     for other in pending:
         for nozzle_id in (other.from_nozzle, other.to_nozzle):
             extra.append(
                 nozzle_reserve(
-                    other.id, design.nozzle(nozzle_id), other.tube, design.workspace.dimensions
+                    other.id,
+                    design.nozzle(nozzle_id),
+                    other.tube,
+                    design.workspace.dimensions,
+                    flange_envelope(other),
                 )
             )
     data = base.model_dump(mode="json")
     data["obstacles"] = [*data["obstacles"], *(box.model_dump(mode="json") for box in extra)]
     return DemoConfig.model_validate(data)
+
+
+def flange_obstacles(line: Line, points: list[Point3], margin: float = 0.0) -> list[BoxObstacle]:
+    """Boxes around a routed line's end flanges (none when the line is welded)."""
+    outer, thickness = flange_envelope(line)
+    if not outer:
+        return []
+    half = outer / 2 + margin
+    boxes = []
+    for name, face, toward in (("start", points[0], points[1]), ("end", points[-1], points[-2])):
+        length = math.dist(face, toward)
+        axis = [(toward[i] - face[i]) / length for i in range(3)]
+        far = [face[i] + axis[i] * thickness for i in range(3)]
+        low = [min(face[i], far[i]) - (0 if axis[i] else half) - margin * bool(axis[i])
+               for i in range(3)]  # fmt: skip
+        high = [max(face[i], far[i]) + (0 if axis[i] else half) + margin * bool(axis[i])
+                for i in range(3)]  # fmt: skip
+        boxes.append(_box(f"line {line.id} {name} flange", low, high))
+    return boxes
 
 
 def order_rationale(line: Line, order: int, total: int) -> Rationale:
@@ -221,6 +261,14 @@ def pair_check(a: Line, b: Line, tube_a: cq.Shape, tube_b: cq.Shape) -> PairChec
         intersects=intersects,
         passed=not intersects and distance + 1e-7 >= required,
     )
+
+
+def _with_flanges(result: PipelineResult) -> cq.Shape:
+    """The routed tube plus its flanges, as one shape for the pair checks."""
+    assert result.tube is not None
+    if result.fittings is None or not result.fittings.flanges:
+        return result.tube
+    return cq.Compound.makeCompound([result.tube, *result.fittings.flanges])
 
 
 def route_design(design: DesignDocument, output: Path) -> DesignRunResult:
@@ -261,7 +309,9 @@ def route_design(design: DesignDocument, output: Path) -> DesignRunResult:
         )
 
     by_id = {line.id: line for line in design.lines}
-    tubes = {line_id: result.tube for line_id, result in sorted(results.items()) if result.tube}
+    tubes = {
+        line_id: _with_flanges(result) for line_id, result in sorted(results.items()) if result.tube
+    }
     pairs = [pair_check(by_id[a], by_id[b], tubes[a], tubes[b]) for a, b in combinations(tubes, 2)]
     reasons = [
         f"line {outcome.line}: {reason}"

@@ -223,6 +223,20 @@ python -m syntera.cli explain --design examples/demo_skid_sized.yaml --path tube
 python -m syntera.cli explain --graph outputs/drawings/<id>/drawing_graph.json --handle 2F --flow 36 --wall 3.9
 ```
 
+A `fittings:` block (in a YAML config, or on a design line) adds standard components:
+an elbow at every bend (a long-radius elbow when the bend radius is 1.5 x OD, otherwise
+a pipe bend) and, when `end_connection: flanged`, a flange at each end, sized from
+synthetic tables by tube OD and rating (`PN16` or `PN40`). Tees and reducers are in the
+library for branch and size-change points. Every fitting is checked with exact geometry
+(clearance, collision, workspace); a failing fitting fails the assurance. `fittings.json`
+lists the fittings, the straight cut lengths between them and the checks, and
+`routed_assembly.step` then holds straight pipe, elbows and flanges. In multi-line
+designs, flanges are obstacles for later lines and part of the pair checks.
+
+```bash
+python -m syntera.cli demo --config examples/demo_skid_fittings.yaml --output outputs/fittings
+```
+
 `layout.dxf` is a general-arrangement drawing in millimetres: plan, front elevation and
 right elevation (third-angle) of the equipment, the nozzles and the routed tube drawn
 along its exact tangent/arc centreline at its outer diameter, with overall dimensions
