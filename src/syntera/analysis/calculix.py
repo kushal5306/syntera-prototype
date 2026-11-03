@@ -64,7 +64,7 @@ def _header(title: str, digest: str) -> list[str]:
     ]
 
 
-def mesh_deck(mesh: ShellMesh, digest: str) -> str:
+def mesh_deck(mesh: ShellMesh, digest: str, supports: list[tuple[int, ...]] = ()) -> str:
     lines = _header("Syntera tube mid-surface mesh", digest)
     lines.append("*NODE, NSET=NALL")
     lines.extend(
@@ -80,11 +80,19 @@ def mesh_deck(mesh: ShellMesh, digest: str) -> str:
     lines.extend(_id_lines(mesh.start_ring))
     lines.append("*NSET, NSET=NEND")
     lines.extend(_id_lines(mesh.end_ring))
+    for index, ring in enumerate(supports, start=1):
+        lines.append(f"*NSET, NSET=NSUP{index}")
+        lines.extend(_id_lines(ring))
     return "\n".join(lines) + "\n"
 
 
-def load_case_deck(analysis: AnalysisSpecification, case: LoadCase, digest: str) -> str:
-    """Build one static step with both tube ends clamped at their ports."""
+def load_case_deck(
+    analysis: AnalysisSpecification, case: LoadCase, digest: str, supports: int = 0
+) -> str:
+    """Build one static step with both tube ends clamped at their ports.
+
+    Each support is a rest support: its ring of nodes is held vertically (DOF 3).
+    """
     material = analysis.material
     lines = _header(f"Syntera load case {case.name}", digest)
     lines += ["*HEADING", f"Syntera tube load case {case.name}", f"*INCLUDE, INPUT={MESH_FILE}"]
@@ -110,6 +118,7 @@ def load_case_deck(analysis: AnalysisSpecification, case: LoadCase, digest: str)
         "*BOUNDARY",
         "NSTART, 1, 6",
         "NEND, 1, 6",
+        *(f"NSUP{index}, 3, 3" for index in range(1, supports + 1)),
     ]
     loads: list[str] = []
     if case.internal_pressure_mpa > 0:
@@ -136,7 +145,12 @@ def load_case_deck(analysis: AnalysisSpecification, case: LoadCase, digest: str)
     return "\n".join(lines) + "\n"
 
 
-def write_fea_inputs(config: DemoConfig, points: list[Point3], output: Path) -> FeaManifest:
+def write_fea_inputs(
+    config: DemoConfig,
+    points: list[Point3],
+    output: Path,
+    supports: list[Point3] = (),
+) -> FeaManifest:
     """Mesh the routed tube and write one CalculiX deck per load case plus a manifest.
 
     Meshing failures are reported in the manifest and no decks are written (fail closed).
@@ -155,6 +169,7 @@ def write_fea_inputs(config: DemoConfig, points: list[Point3], output: Path) -> 
             analysis.material.yield_strength_mpa / analysis.acceptance.stress_safety_factor
         ),
         maximum_displacement_mm=analysis.acceptance.maximum_displacement_mm,
+        supports=list(supports),
     )
     try:
         mesh = mesh_tube(
@@ -167,12 +182,13 @@ def write_fea_inputs(config: DemoConfig, points: list[Point3], output: Path) -> 
     except ValueError as error:
         manifest = manifest.model_copy(update={"diagnostic": f"meshing failed safely: {error}"})
     else:
-        (output / MESH_FILE).write_text(mesh_deck(mesh, digest), encoding="utf-8")
+        rings = [mesh.ring_near(point) for point in supports]
+        (output / MESH_FILE).write_text(mesh_deck(mesh, digest, rings), encoding="utf-8")
         decks: list[FeaLoadCaseDeck] = []
         for case in analysis.load_cases:
             deck_file = f"{case.name}.inp"
             (output / deck_file).write_text(
-                load_case_deck(analysis, case, digest), encoding="utf-8"
+                load_case_deck(analysis, case, digest, len(rings)), encoding="utf-8"
             )
             decks.append(
                 FeaLoadCaseDeck(name=case.name, deck_file=deck_file, result_file=f"{case.name}.dat")

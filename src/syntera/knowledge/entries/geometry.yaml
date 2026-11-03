@@ -76,3 +76,43 @@
   citations:
     - kind: practice
       source: Piping layout practice of placing large-bore lines before small-bore lines
+
+- id: kb.rule.support_span
+  kind: rule
+  title: Support spacing from a sag limit
+  summary: >-
+    Supports are spaced so a span of pipe, full of its contents, sags no more than a
+    small limit between them; heavier or more flexible pipe gets closer supports.
+  detail: >-
+    Each span is treated as a simply supported beam under a uniform load w (pipe metal
+    plus contents). Its mid-span deflection is 5 w L^4 / (384 E I), so the longest span
+    for a deflection limit is L = (384 E I limit / (5 w))^(1/4), rounded down to 10 mm.
+    Supports then go on straight runs, as far apart as that span allows, with the line
+    ends anchored at their ports. The default limit is synthetic.
+  rules:
+    - rules.support_span_deflection.v1
+    - rules.support_placement_max_span.v1
+  keywords: [support, span, sag, deflection, pipe rack, hanger]
+  synthetic: false
+  citations:
+    - kind: textbook
+      source: Deflection of a simply supported beam under uniform load, in strength-of-materials texts
+    - kind: practice
+      source: Piping practice of limiting sag between supports to a few millimetres
+
+- id: kb.rule.spool_split
+  kind: rule
+  title: Splitting a line into spools
+  summary: >-
+    A line is cut into prefabricated spools no longer than a maximum length, cutting only
+    straight pipe and keeping welds clear of bends.
+  detail: >-
+    Spools are limited by transport and handling; the default maximum is synthetic. Cuts
+    are placed greedily from the start of the line on straight runs, never closer than a
+    weld clearance to the tangent point of a bend.
+  rules: [rules.spool_split_max_length.v1]
+  keywords: [spool, fabrication, cut, weld, transport]
+  synthetic: false
+  citations:
+    - kind: practice
+      source: Shop prefabrication of piping spools sized for transport, with field welds on straight pipe

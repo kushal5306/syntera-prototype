@@ -42,6 +42,9 @@ KNOWN_RULE_IDS: frozenset[str] = frozenset(
         "rules.material_by_medium_temperature.v1",
         "rules.maximum_velocity_by_medium.v1",
         "rules.minimum_inner_diameter_from_velocity.v1",
+        "rules.spool_split_max_length.v1",
+        "rules.support_placement_max_span.v1",
+        "rules.support_span_deflection.v1",
         "rules.tube_size_from_flow.v1",
         "rules.wall_thickness_hoop_stress.v1",
     }

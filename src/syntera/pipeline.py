@@ -17,6 +17,7 @@ from syntera.components.fittings import (
     place_fittings,
     verify_fittings,
 )
+from syntera.components.supports import SUPPORTS_FILE, SupportLayout, support_layout
 from syntera.components.tables import TableError
 from syntera.geometry.cad import assembly_shapes, export_step, make_tube
 from syntera.geometry.step_import import import_step_obstacle
@@ -31,6 +32,7 @@ from syntera.reporting.layout_dxf import write_layout_dxf
 from syntera.reporting.metrics import package_metrics
 from syntera.reporting.output import write_json, write_preview
 from syntera.routing.astar import AStarRouter
+from syntera.rules.sizing import RuleError
 from syntera.schemas import (
     AssuranceReport,
     DemoConfig,
@@ -56,6 +58,7 @@ class PipelineResult:
     metrics: PackageMetrics | None = None
     rationale: RationaleReport | None = None
     fittings: FittingSet | None = None
+    supports: SupportLayout | None = None
 
 
 def execute_pipeline(
@@ -84,6 +87,7 @@ def execute_pipeline(
         "layout.dxf",
         RATIONALE_FILE,
         FITTINGS_FILE,
+        SUPPORTS_FILE,
     ):
         (output / filename).unlink(missing_ok=True)
     shutil.rmtree(output / "fea", ignore_errors=True)
@@ -125,6 +129,15 @@ def execute_pipeline(
         if config.fittings is not None:
             fittings, report, parts = _with_fittings(config, route, report)
         export_step([*assembly, *parts], output / "routed_assembly.step")
+    supports = None
+    if config.supports is not None and tube is not None:
+        try:
+            supports = support_layout(config, route.points)
+        except (RuleError, ValueError) as error:
+            reasons = [*report.failure_reasons, f"supports could not be placed: {error}"]
+            report = report.model_copy(update={"overall_pass": False, "failure_reasons": reasons})
+        else:
+            write_json(supports, output / SUPPORTS_FILE)
     write_json(report, output / "assurance_report.json")
     if fittings is not None:
         write_json(fittings.report, output / FITTINGS_FILE)
@@ -133,8 +146,10 @@ def execute_pipeline(
     write_json(metrics, output / "metrics.json")
     fea = None
     if config.analysis is not None and report.overall_pass:
-        fea = write_fea_inputs(config, route.points, output / "fea")
+        held = [point.position for point in supports.supports] if supports else []
+        fea = write_fea_inputs(config, route.points, output / "fea", held)
     return PipelineResult(
+        supports=supports,
         fittings=fittings,
         assembly=assembly,
         route=route,

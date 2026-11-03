@@ -35,6 +35,7 @@ from syntera.schemas import (
     RouteResult,
     RoutingWeights,
     StepObstacle,
+    SupportSpec,
     TubeSpecification,
     Workspace,
 )
@@ -90,6 +91,7 @@ class Line(StrictModel):
     line_sizing: LineSizingSpec | None = None
     analysis: AnalysisSpecification | None = None
     fittings: FittingSpec | None = None
+    supports: SupportSpec | None = None
 
     @model_validator(mode="after")
     def ends_must_differ(self) -> Line:
@@ -273,6 +275,7 @@ def design_from_config(
                 line_sizing=sizing,
                 analysis=config.analysis,
                 fittings=config.fittings,
+                supports=config.supports,
             )
         ],
         parameters=DesignParameters(
@@ -326,6 +329,7 @@ def run_config(design: DesignDocument, line_id: str | None = None) -> DemoConfig
         routing_cost_weights=design.parameters.routing_cost_weights,
         analysis=line.analysis,
         fittings=line.fittings,
+        supports=line.supports,
     )
 
 
