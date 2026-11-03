@@ -1,0 +1,64 @@
+{
+  "equipment": [
+    {
+      "geometry": {
+        "center": [400, 250, 100],
+        "name": "process-vessel",
+        "size": [160, 160, 200],
+        "type": "box"
+      },
+      "id": "process-vessel"
+    },
+    {
+      "geometry": {
+        "axis": "z",
+        "center": [600, 400, 60],
+        "height": 120,
+        "name": "transfer-pump",
+        "radius": 40,
+        "type": "cylinder"
+      },
+      "id": "transfer-pump"
+    }
+  ],
+  "inputs": [],
+  "lines": [
+    {
+      "from_nozzle": "branch-in",
+      "id": "branch",
+      "to_nozzle": "branch-out",
+      "tube": {"minimum_bend_radius": 30, "minimum_clearance": 20, "outer_diameter": 20}
+    },
+    {
+      "from_nozzle": "drain-in",
+      "id": "drain",
+      "to_nozzle": "drain-out",
+      "tube": {"minimum_bend_radius": 18, "minimum_clearance": 15, "outer_diameter": 12}
+    },
+    {
+      "from_nozzle": "header-in",
+      "id": "header",
+      "to_nozzle": "header-out",
+      "tube": {"minimum_bend_radius": 45, "minimum_clearance": 20, "outer_diameter": 30}
+    }
+  ],
+  "nozzles": [
+    {"id": "branch-in", "port": {"direction": [1, 0, 0], "position": [40, 400, 100]}},
+    {"id": "branch-out", "port": {"direction": [-1, 0, 0], "position": [760, 400, 300]}},
+    {"id": "drain-in", "port": {"direction": [0, 1, 0], "position": [200, 40, 300]}},
+    {"id": "drain-out", "port": {"direction": [0, 0, -1], "position": [600, 260, 340]}},
+    {"id": "header-in", "port": {"direction": [1, 0, 0], "position": [40, 100, 100]}},
+    {"id": "header-out", "port": {"direction": [-1, 0, 0], "position": [760, 100, 100]}}
+  ],
+  "parameters": {
+    "routing_cost_weights": {"bend": 80, "obstacle_proximity": 40, "port_direction": 1000},
+    "voxel_resolution": 20
+  },
+  "rationale": [],
+  "routes": [],
+  "schema_version": 1,
+  "synthetic_data": true,
+  "title": "Synthetic three-line skid (multi-line routing demonstration)",
+  "units": "mm",
+  "workspace": {"dimensions": [800, 500, 400], "units": "mm"}
+}

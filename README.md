@@ -125,6 +125,19 @@ Identical design input gives byte-identical route, rationale, design, metrics, F
 and comparison files. In the web app, a design record applies only while the posted
 configuration still has the value it explains.
 
+A design with several lines routes with `route-design`: lines go largest outside diameter
+first (equal sizes by line id, rule `design.largest_bore_first.v1`, recorded as
+`routing_order` in each line's `rationale.json`). Each line is routed and verified by the
+single-line pipeline with all equipment, conservative boxes around every pipe already
+routed and reserved space at the nozzles of lines still to come as obstacles. Every pair
+of tube solids is then checked with exact geometry (no intersection, gap at least the
+larger clearance). Outputs: `lines/<id>/` per line, `design.json` with every route,
+`design_report.json` and `routed_design.step`. Shared nozzles (tees) are refused for now.
+
+```bash
+python -m syntera.cli route-design --design examples/demo_three_lines.design.json --output outputs/three-lines
+```
+
 `layout.dxf` is a general-arrangement drawing in millimetres: plan, front elevation and
 right elevation (third-angle) of the equipment, the nozzles and the routed tube drawn
 along its exact tangent/arc centreline at its outer diameter, with overall dimensions

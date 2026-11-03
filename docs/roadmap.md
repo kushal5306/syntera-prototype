@@ -31,7 +31,7 @@ Status values: `todo`, `in-review` (PR open), `done` (merged), `blocked` (reason
 | 2b | A2b | Demo, compare and web runs size a line from flow | Design model | A2a | done | [#23](https://github.com/kushal5306/syntera-prototype/pull/23) |
 | 3a | A3a | Canonical design document: schema, conversion, persistence, migration | Design model | A1 | done | [#24](https://github.com/kushal5306/syntera-prototype/pull/24) |
 | 3b | A3b | CLI and web runs derive all outputs from the design document | Design model | A3a | done | [#26](https://github.com/kushal5306/syntera-prototype/pull/26) |
-| 4 | B1 | Multi-line design from the design document | 3D engine | A3a | todo | |
+| 4 | B1 | Multi-line design from the design document | 3D engine | A3a | done | [#27](https://github.com/kushal5306/syntera-prototype/pull/27) |
 | 5 | A4 | Change sets and design diff | Design model | A3a | todo | |
 | 6 | D1 | DWG export through external converter | DWG I/O | - | todo | |
 | 7 | C1 | Hidden-line projection from exact B-rep | 2D drawings | A3a | todo | |
