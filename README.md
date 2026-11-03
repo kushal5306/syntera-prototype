@@ -152,6 +152,16 @@ change set edits inputs only; verdicts always come from the deterministic checks
 python -m syntera.cli change --design examples/demo_skid.yaml --changes examples/demo_skid.changes.json --output outputs/changed --regenerate
 ```
 
+DWG export converts a generated DXF with the ODA File Converter when `ODAFileConverter`
+is on `PATH` (installed by the user under ODA's terms; never bundled or linked). Without
+it, export is refused with a clear message and the DXF remains the deliverable. Each
+export writes `<name>.export.json` with the converter, DWG release and SHA-256 of the DXF
+and the DWG; `/api/drawings/capabilities` reports `dwg_export`.
+
+```bash
+python -m syntera.cli export-dwg --input outputs/demo/layout.dxf --output outputs/demo/layout.dwg
+```
+
 `layout.dxf` is a general-arrangement drawing in millimetres: plan, front elevation and
 right elevation (third-angle) of the equipment, the nozzles and the routed tube drawn
 along its exact tangent/arc centreline at its outer diameter, with overall dimensions

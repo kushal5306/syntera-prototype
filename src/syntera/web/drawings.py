@@ -11,6 +11,7 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse
 
 from syntera.drawings.convert import DrawingError, available_converters
+from syntera.drawings.export import dwg_writer
 from syntera.drawings.intake import (
     DRAWING_ID,
     DXF_FILE,
@@ -109,6 +110,7 @@ def drawings_router(root: Path) -> APIRouter:
         return {
             "dwg": bool(converters),
             "converter": converters[0].name if converters else None,
+            "dwg_export": dwg_writer() is not None,
             "max_upload_mb": MAX_UPLOAD_BYTES // (1024 * 1024),
         }
 
