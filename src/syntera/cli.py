@@ -151,6 +151,19 @@ def run_change(design_path: Path, changes_path: Path, output: Path, regenerate: 
     return status
 
 
+def run_export_dwg(source: Path, target: Path, release: str) -> int:
+    """Convert a generated DXF to DWG with the ODA File Converter, when installed."""
+    from syntera.drawings.export import export_dwg
+
+    record = export_dwg(source, target, release)
+    write_json(record, target.with_suffix(".export.json"))
+    print(f"DWG: {target} ({record.release}, written by {record.converter})")
+    for warning in record.warnings:
+        print(f"- {warning}")
+    print(f"Record: {target.with_suffix('.export.json')}")
+    return 0
+
+
 def run_drawing(source: Path, output: Path) -> int:
     """Convert (if DWG), read and render one drawing into ``output/<drawing_id>``."""
     from syntera.drawings.intake import SUMMARY_FILE, ingest_drawing
@@ -363,6 +376,12 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="route and verify the design before and after, and report changed verdicts",
     )
+    export = subparsers.add_parser(
+        "export-dwg", help="convert a DXF to DWG with the ODA File Converter (if installed)"
+    )
+    export.add_argument("--input", type=Path, required=True)
+    export.add_argument("--output", type=Path, required=True)
+    export.add_argument("--release", default="ACAD2018", help="ODA output version name")
     drawing = subparsers.add_parser(
         "drawing", help="convert a DWG/DXF drawing to DXF, an SVG view and a JSON summary"
     )
@@ -451,6 +470,8 @@ def main(argv: list[str] | None = None) -> int:
             return run_route_design(args.design, args.output)
         if args.command == "change":
             return run_change(args.design, args.changes, args.output, args.regenerate)
+        if args.command == "export-dwg":
+            return run_export_dwg(args.input, args.output, args.release)
         if args.command == "drawing":
             return run_drawing(args.input, args.output)
         if args.command == "audit-step":
