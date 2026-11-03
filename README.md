@@ -357,6 +357,16 @@ The **Optimisation** page (`/optimise`, `POST /api/optimise`) runs a small study
 20 candidates) on the server's configured design and plots the Pareto set; a study cannot
 name another design.
 
+### Background jobs
+
+Long work can run as a background job: `POST /api/jobs` with `{"kind", "payload"}`
+returns `202` and a `status_url`; `GET /api/jobs/{id}` reports `queued`, `running`,
+`succeeded` (with the result) or `failed` (with the error). Kinds: `route-design` (the
+latest design version), `optimise` (a study) and `fea` (solve and check the latest
+workbench run's CalculiX decks). The in-process queue runs one job at a time in
+submission order and keeps every job record on disk; a job interrupted by a restart is
+reported as failed. An external queue can implement the same `JobQueue` protocol.
+
 `layout.dxf` is a general-arrangement drawing in millimetres: plan, front elevation and
 right elevation (third-angle) of the equipment, the nozzles and the routed tube drawn
 along its exact tangent/arc centreline at its outer diameter, with overall dimensions

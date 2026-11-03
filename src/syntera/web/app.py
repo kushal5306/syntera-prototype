@@ -43,6 +43,7 @@ from syntera.web.assistant import ProviderFactory, assistant_router
 from syntera.web.audit import audit_router
 from syntera.web.design_api import design_router
 from syntera.web.drawings import drawings_router
+from syntera.web.jobs import in_process_queue, jobs_router
 from syntera.web.mesh import scene_meshes
 from syntera.web.optimise import optimise_router
 from syntera.web.pid import pid_router
@@ -132,6 +133,9 @@ def create_app(
     app.include_router(design_router(config_path, output_root / "design"))
     app.include_router(sheets_router(output, output_root / "sheets", output_root / "drawings"))
     app.include_router(optimise_router(config_path, output_root / "optimise"))
+    queue = in_process_queue(config_path, output_root)
+    app.state.jobs = queue
+    app.include_router(jobs_router(queue))
     app.include_router(
         assistant_router(config_path, output_root, assistant_provider or provider_from_env)
     )
