@@ -21,10 +21,16 @@ from syntera.drawings.models import (
     LayerSummary,
     TextNote,
 )
+from syntera.drawings.structure import (
+    block_references,
+    layout_summaries,
+    normalise_mtext,
+    xref_summaries,
+)
 
 MAX_NOTES = 500
 # Bump when the SVG rendering changes so stored drawings are re-rendered on next access.
-RENDER_VERSION = 4
+RENDER_VERSION = 5
 PAPER = "#ffffff"
 # Drawing colours are darkened until they reach this contrast ratio against white paper,
 # so white, yellow and cyan CAD colours stay legible (WCAG 2.1 non-text contrast).
@@ -174,7 +180,7 @@ def notes(space: BaseLayout) -> tuple[list[DimensionNote], list[TextNote], bool]
             if len(texts) >= MAX_NOTES:
                 truncated = True
                 continue
-            content = entity.plain_text() if kind == "MTEXT" else entity.dxf.text
+            content = normalise_mtext(entity) if kind == "MTEXT" else entity.dxf.text
             point = entity.dxf.insert
             texts.append(
                 TextNote(
@@ -280,6 +286,7 @@ def read_drawing(path: Path) -> dict:
     per_layer = Counter(entity.dxf.layer for entity in space)
     inserts = Counter(entity.dxf.name for entity in space.query("INSERT"))
     dimensions, texts, truncated = notes(space)
+    references, references_truncated = block_references(doc)
     return {
         "space": space.name,
         "dxf_version": doc.dxfversion,
@@ -293,7 +300,10 @@ def read_drawing(path: Path) -> dict:
         "block_inserts": dict(sorted(inserts.items())),
         "dimensions": dimensions,
         "texts": texts,
-        "truncated": truncated,
+        "truncated": truncated or references_truncated,
+        "layouts": layout_summaries(doc),
+        "block_references": references,
+        "xrefs": xref_summaries(doc),
         "audit_errors": audit_errors,
         "audit_fixes": audit_fixes,
         "render_version": RENDER_VERSION,

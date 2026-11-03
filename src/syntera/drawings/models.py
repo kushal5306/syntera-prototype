@@ -50,6 +50,40 @@ class TextNote(DrawingModel):
     position: tuple[float, float]
 
 
+class LayoutSummary(DrawingModel):
+    """One paper-space layout (sheet) of the drawing."""
+
+    name: str
+    tab_order: int
+    entity_count: int
+    viewports: int
+    block_inserts: dict[str, int]
+
+
+BlockRole = Literal["title_block", "bom_row", "other"]
+
+
+class BlockReference(DrawingModel):
+    """A block insert that carries attributes (title blocks, BOM rows, tags)."""
+
+    handle: str
+    space: str
+    block: str
+    layer: str
+    position: tuple[float, float]
+    role: BlockRole
+    attributes: dict[str, str]
+
+
+class XrefSummary(DrawingModel):
+    """An external reference: a block defined by another drawing file."""
+
+    name: str
+    path: str
+    overlay: bool
+    inserts: int
+
+
 class DrawingSummary(DrawingModel):
     """Deterministic facts read from the drawing's model space (or, if that draws nothing,
     its first paper-space layout), in drawing units."""
@@ -79,6 +113,10 @@ class DrawingSummary(DrawingModel):
     render_version: int = 1
     # Which layout the summary and SVG describe: "Model", or a paper-space layout name.
     space: str = "Model"
+    # Structure across the whole drawing (render version 5 onwards).
+    layouts: list[LayoutSummary] = Field(default_factory=list)
+    block_references: list[BlockReference] = Field(default_factory=list)
+    xrefs: list[XrefSummary] = Field(default_factory=list)
 
 
 LayerRole = Literal[

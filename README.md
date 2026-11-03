@@ -306,6 +306,12 @@ Each drawing is stored under `<output>/drawings/<id>/` with `drawing.dxf`, `draw
 `summary.json`; the id is the first 16 hex digits of the file's SHA-256, so the same file
 always gives the same record.
 
+Besides the drawn space's entities, dimensions and notes, `summary.json` lists every
+paper-space layout (tab order, entities, viewports, block inserts), every block insert
+that carries attributes in any space with its attribute values and a keyword-rule role
+(`title_block`, `bom_row` or `other`), external references (name, path, overlay, insert
+count), and MTEXT normalised to plain lines without formatting codes.
+
 DWG is a closed format, so conversion uses an external program, chosen in this order:
 
 - **ODA File Converter** (`ODAFileConverter` on `PATH`): the most faithful reader. It is free
