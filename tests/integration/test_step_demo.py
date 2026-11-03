@@ -42,6 +42,7 @@ def test_step_obstacle_demo_routes_and_reports_import(tmp_path, vessel_step):
         "layout.dxf",
         "import_report.json",
         "rationale.json",
+        "design.json",
         "fea",
     } == {path.name for path in output.iterdir()}
 

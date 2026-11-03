@@ -113,7 +113,17 @@ files, and a run derived from the document writes the same `route.json` and
 
 ```bash
 python -m syntera.cli design --config examples/demo_skid_sized.yaml --output outputs/design
+python -m syntera.cli demo --config outputs/design/design.json --output outputs/from-design
 ```
+
+Every run derives its configuration from a design document: `demo`, `fea-evaluate` and
+`web` accept either a YAML configuration (converted on the fly) or a `design.json`, and
+`--line` picks the line when a design has several. `demo` writes `design.json` next to
+its outputs with the routed centreline recorded under `routes`; routes are outputs kept
+for traceability, never evidence, and the verdict stays in `assurance_report.json`.
+Identical design input gives byte-identical route, rationale, design, metrics, FEA deck
+and comparison files. In the web app, a design record applies only while the posted
+configuration still has the value it explains.
 
 `layout.dxf` is a general-arrangement drawing in millimetres: plan, front elevation and
 right elevation (third-angle) of the equipment, the nozzles and the routed tube drawn

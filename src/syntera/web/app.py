@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field
 from syntera.analysis.calculix import input_sha256
 from syntera.analysis.fields import parse_case_fields, parse_mesh_inp, solve_decks
 from syntera.analysis.results import evaluate_acceptance
-from syntera.config import load_config, load_sized_config
+from syntera.design import load_run, rationale_still_applies
 from syntera.geometry.cad import assembly_shapes
 from syntera.geometry.step_import import StepImportError
 from syntera.pipeline import PipelineResult, execute_pipeline
@@ -116,7 +116,7 @@ def create_app(
 
     def checked(config: DemoConfig) -> DemoConfig:
         """Only STEP files named by the server-side config may be opened from a request."""
-        unknown = _step_paths(config) - _step_paths(load_config(config_path))
+        unknown = _step_paths(config) - _step_paths(load_run(config_path)[1])
         if unknown:
             raise HTTPException(
                 status_code=422,
@@ -142,7 +142,7 @@ def create_app(
 
     @app.get("/api/config")
     def get_config() -> dict:
-        return load_config(config_path).model_dump(mode="json")
+        return load_run(config_path)[1].model_dump(mode="json")
 
     @app.post("/api/preview")
     def preview(config: DemoConfig) -> dict:
@@ -167,9 +167,10 @@ def create_app(
             if task:
                 log_time(task, "generate", "start", actor="syntera")
             try:
-                sized, sizing = load_sized_config(config_path)
+                _, sized, sizing = load_run(config_path)
                 if not sizing_still_applies(sized, config):
                     sizing = []  # edited in the browser: the edited values are the user's
+                sizing = rationale_still_applies(config, sizing)
                 result = execute_pipeline(checked(config), output, rationale=sizing)
             except StepImportError as error:
                 raise HTTPException(status_code=422, detail=str(error)) from error

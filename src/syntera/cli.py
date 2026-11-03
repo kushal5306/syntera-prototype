@@ -12,7 +12,6 @@ from pydantic import ValidationError
 
 from syntera.analysis.calculix import MANIFEST_FILE, input_sha256
 from syntera.analysis.results import evaluate_acceptance
-from syntera.config import load_config, load_sized_config
 from syntera.pipeline import execute_pipeline
 from syntera.reporting.output import write_json
 from syntera.schemas import FeaManifest, RouteResult
@@ -20,17 +19,29 @@ from syntera.schemas import FeaManifest, RouteResult
 ComputeStep = Callable[[], int]
 
 
-def run_demo(config_path: Path, output: Path) -> int:
-    config, sizing = load_sized_config(config_path)
-    result = execute_pipeline(config, output, rationale=sizing)
+def run_demo(config_path: Path, output: Path, line_id: str | None = None) -> int:
+    """Route and verify one line of a design document (or a YAML config converted to one).
+
+    The run configuration and rationale are derived from the design document, and the
+    document is written to ``output/design.json`` with the route the pipeline produced.
+    """
+    from syntera.design import DESIGN_FILE, load_run, save_design, with_route
+
+    design, config, records = load_run(config_path, line_id)
+    line = design.line(line_id)
+    (output / DESIGN_FILE).unlink(missing_ok=True)
+    result = execute_pipeline(config, output, rationale=records)
     report = result.report
+    save_design(with_route(design, line.id, result.route), output / DESIGN_FILE)
 
     print(f"Route found: {report.route_found}")
     print(f"Overall assurance: {'PASS' if report.overall_pass else 'FAIL'}")
     print(f"Report: {output / 'assurance_report.json'}")
-    if sizing and result.rationale is not None:
+    print(f"Design: {output / DESIGN_FILE} (line {line.id})")
+    if result.rationale is not None:
         od = result.rationale.get("tube.outer_diameter")
-        print(f"Line sized by rules: OD {od.value:g} mm ({od.rule_id})")
+        if od.source == "rule":
+            print(f"Line sized by rules: OD {od.value:g} mm ({od.rule_id})")
     if report.failure_reasons:
         print("Reasons: " + "; ".join(report.failure_reasons))
     if result.fea is not None:
@@ -41,9 +52,11 @@ def run_demo(config_path: Path, output: Path) -> int:
     return 0 if report.overall_pass else 2
 
 
-def run_fea_evaluate(config_path: Path, output: Path) -> int:
+def run_fea_evaluate(config_path: Path, output: Path, line_id: str | None = None) -> int:
     """Apply acceptance thresholds to CalculiX results solved from generated decks."""
-    config = load_config(config_path)
+    from syntera.design import load_run
+
+    _, config, _ = load_run(config_path, line_id)
     fea_dir = output / "fea"
     manifest = FeaManifest.model_validate_json(
         (fea_dir / MANIFEST_FILE).read_text(encoding="utf-8")
@@ -246,14 +259,20 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="syntera", description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
     demo = subparsers.add_parser("demo", help="route and verify the synthetic skid")
-    demo.add_argument("--config", type=Path, required=True)
+    demo.add_argument(
+        "--config", type=Path, required=True, help="YAML config or design.json document"
+    )
     demo.add_argument("--output", type=Path, required=True)
+    demo.add_argument("--line", help="line id to route when the design has several")
     _add_time_log(demo)
     evaluate = subparsers.add_parser(
         "fea-evaluate", help="apply FEA acceptance thresholds to solved CalculiX results"
     )
-    evaluate.add_argument("--config", type=Path, required=True)
+    evaluate.add_argument(
+        "--config", type=Path, required=True, help="YAML config or design.json document"
+    )
     evaluate.add_argument("--output", type=Path, required=True)
+    evaluate.add_argument("--line", help="line id when the design has several")
     _add_time_log(evaluate)
     design = subparsers.add_parser(
         "design", help="convert a YAML configuration into a canonical design.json"
@@ -326,14 +345,17 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "demo":
             return run_timed(
-                args.time_log, args.task, "generate", lambda: run_demo(args.config, args.output)
+                args.time_log,
+                args.task,
+                "generate",
+                lambda: run_demo(args.config, args.output, args.line),
             )
         if args.command == "fea-evaluate":
             return run_timed(
                 args.time_log,
                 args.task,
                 "fea-check",
-                lambda: run_fea_evaluate(args.config, args.output),
+                lambda: run_fea_evaluate(args.config, args.output, args.line),
             )
         if args.command == "time":
             return run_time(args.action, args.log, args.task, args.phase, args.note)
