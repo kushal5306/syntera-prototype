@@ -256,6 +256,32 @@ def run_knowledge(entry_id: str | None) -> int:
     return 0
 
 
+def run_search(query: str, designs: list[Path], graphs: list[Path], limit: int) -> int:
+    """Rank knowledge, design rationale and drawing graphs for a query (local BM25)."""
+    from syntera.design import load_design_input
+    from syntera.knowledge import load_knowledge
+    from syntera.knowledge.retrieval import build_index
+
+    rationale = []
+    for path in designs:
+        design = load_design_input(path)
+        rationale.append((path.stem, design.rationale))
+    loaded = []
+    if graphs:
+        from syntera.drawings.graph import DrawingGraph
+
+        for path in graphs:
+            loaded.append(
+                (path.parent.name or path.stem, DrawingGraph.model_validate_json(path.read_bytes()))
+            )
+    index = build_index(load_knowledge(), rationale, loaded)
+    hits = index.search(query, limit)
+    print(f"{len(hits)} result(s) from {len(index)} documents")
+    for hit in hits:
+        print(f"{hit.score:8.3f}  [{hit.kind}] {hit.title}  ({hit.id})")
+    return 0
+
+
 def run_drawing(source: Path, output: Path) -> int:
     """Convert (if DWG), read and render one drawing into ``output/<drawing_id>``."""
     from syntera.drawings.intake import SUMMARY_FILE, ingest_drawing
@@ -495,6 +521,13 @@ def build_parser() -> argparse.ArgumentParser:
         "knowledge", help="list knowledge entries or show one with its citations"
     )
     knowledge.add_argument("--id", dest="entry_id")
+    search = subparsers.add_parser(
+        "search", help="local keyword search over knowledge, rationale and drawing graphs"
+    )
+    search.add_argument("--query", required=True)
+    search.add_argument("--design", type=Path, action="append", default=[])
+    search.add_argument("--graph", type=Path, action="append", default=[])
+    search.add_argument("--limit", type=int, default=10)
     drawing = subparsers.add_parser(
         "drawing", help="convert a DWG/DXF drawing to DXF, an SVG view and a JSON summary"
     )
@@ -593,6 +626,8 @@ def main(argv: list[str] | None = None) -> int:
             return run_drawing_graph(args.input, args.output, args.tag)
         if args.command == "knowledge":
             return run_knowledge(args.entry_id)
+        if args.command == "search":
+            return run_search(args.query, args.design, args.graph, args.limit)
         if args.command == "drawing":
             return run_drawing(args.input, args.output)
         if args.command == "audit-step":
