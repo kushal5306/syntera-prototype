@@ -30,6 +30,30 @@
       "path": "/api/v1/capabilities"
     },
     {
+      "method": "POST",
+      "path": "/api/v1/chat/files"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/chat/sessions"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/chat/sessions/{session_id}"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/chat/sessions/{session_id}/messages"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/chat/status"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/chat/views/{view_id}"
+    },
+    {
       "method": "GET",
       "path": "/api/v1/config"
     },
@@ -174,6 +198,10 @@
     ],
     "POST /api/v1/assistant/design": [
       "request"
+    ],
+    "POST /api/v1/chat/sessions/{session_id}/messages": [
+      "file_ids",
+      "text"
     ],
     "POST /api/v1/design/apply": [
       "changes",

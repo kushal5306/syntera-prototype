@@ -470,7 +470,7 @@ function detailFolds(r) {
 // ---- route workbench, shown inside this page ----
 function openBench(drawingId, line) {
   const folder = line.folder.split("/").pop();
-  benchAt(`/?embed=1&drawing=${encodeURIComponent(drawingId)}&line=${encodeURIComponent(folder)}`, line.name);
+  benchAt(`/expert?embed=1&drawing=${encodeURIComponent(drawingId)}&line=${encodeURIComponent(folder)}`, line.name);
 }
 
 function benchAt(src, title) {
@@ -637,7 +637,7 @@ function renderPlant(payload) {
       el("a", { class: "btn", href: `${base}/plant_layout.json` }, "Layout JSON")),
     section("Lines", `grid ${fmt(r.voxel_resolution_mm, 0)} mm`, table([["Line"], ["Length", "r"], ["Checks"]],
       r.routes.map((route) => el("tr", { title: route.failure_reasons.join("; ") },
-        el("td", {}, route.routed ? el("button", { class: "link", type: "button", title: "Open in route workbench", onclick: () => benchAt(`/?embed=1&pid=${encodeURIComponent(payload.plant_id)}&route=${encodeURIComponent(route.folder)}`, route.line) }, route.line) : route.line,
+        el("td", {}, route.routed ? el("button", { class: "link", type: "button", title: "Open in route workbench", onclick: () => benchAt(`/expert?embed=1&pid=${encodeURIComponent(payload.plant_id)}&route=${encodeURIComponent(route.folder)}`, route.line) }, route.line) : route.line,
           el("div", { class: "note line-label" }, route.label)),
         el("td", { class: "r num" }, route.length_mm === null ? "–" : `${fmt(route.length_mm / 1000, 2)} m`),
         el("td", {}, el("span", { class: `chip ${route.assurance_pass ? "pass" : "fail"}` }, route.assurance_pass ? "pass" : "not routed")))))),
@@ -776,7 +776,7 @@ async function upload(file) {
 async function init() {
   bindSheet();
   $("bench-back").addEventListener("click", closeBench);
-  $("open-demo-bench").addEventListener("click", (event) => { event.target.closest("details").open = false; benchAt("/?embed=1", "Demo skid"); });
+  $("open-demo-bench").addEventListener("click", (event) => { event.target.closest("details").open = false; benchAt("/expert?embed=1", "Demo skid"); });
   document.addEventListener("keydown", (event) => { if (event.key === "Escape" && !$("bench").hidden) closeBench(); });
   document.querySelectorAll(".menu input[type=file]").forEach((input) => input.addEventListener("change", () => { input.closest("details").open = false; }));
   $("audit-input").addEventListener("change", (event) => {

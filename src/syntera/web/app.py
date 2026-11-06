@@ -41,6 +41,7 @@ from syntera.rules import sizing_still_applies
 from syntera.schemas import DemoConfig, Label, StepObstacle, TimeActor
 from syntera.web.assistant import ProviderFactory, assistant_router
 from syntera.web.audit import audit_router
+from syntera.web.chat import ChatModelFactory, chat_router
 from syntera.web.design_api import design_router
 from syntera.web.drawings import drawings_router
 from syntera.web.jobs import in_process_queue, jobs_router
@@ -119,6 +120,8 @@ def create_app(
     output_root: Path,
     manual_baseline: Path | None = None,
     assistant_provider: ProviderFactory | None = None,
+    chat_model: ChatModelFactory | None = None,
+    chat_runner=None,
 ) -> FastAPI:
     """Create an application bound to one initial config and controlled output root."""
     static = Path(__file__).with_name("static")
@@ -140,6 +143,17 @@ def create_app(
     app.include_router(
         assistant_router(config_path, output_root, assistant_provider or provider_from_env)
     )
+    examples = config_path.resolve().parent
+    chat_options = {"model_factory": chat_model} if chat_model else {}
+    if chat_runner is not None:
+        chat_options["runner"] = chat_runner
+    app.include_router(
+        chat_router(
+            output_root,
+            examples if (examples / "plant_room_drawing.py").is_file() else None,
+            **chat_options,
+        )
+    )
 
     def checked(config: DemoConfig) -> DemoConfig:
         """Only STEP files named by the server-side config may be opened from a request."""
@@ -152,6 +166,10 @@ def create_app(
         return config
 
     @app.get("/", include_in_schema=False)
+    def chat_page() -> FileResponse:
+        return FileResponse(static / "chat.html")
+
+    @app.get("/expert", include_in_schema=False)
     def index() -> FileResponse:
         return FileResponse(static / "index.html")
 
