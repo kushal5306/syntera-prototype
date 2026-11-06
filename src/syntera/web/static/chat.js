@@ -287,7 +287,7 @@
     let marker = null, box = new THREE.Box3(), xray = false;
     const hidden = new Set();
     const orbit = { target: new THREE.Vector3(), yaw: -0.9, pitch: 0.6, dist: 10000 };
-    const KIND_LABEL = { obstacle: "Equipment and steel", route: "Syntera's pipes", drawn: "Pipes as drawn" };
+    const KIND_LABEL = { port: "Nozzles", obstacle: "Equipment and steel", route: "Syntera's pipes", drawn: "Pipes as drawn" };
 
     function place() {
       const p = orbit.pitch, y = orbit.yaw;

@@ -529,6 +529,8 @@ def drawing_summary(report, drawing_id: str) -> dict:
     verdict = "unsupported" if not report.supported else ("pass" if passes else "fail")
     drawn = report.total_drawn_length_mm
     saved_mm = sum(line.length_saving_mm or 0 for line in savings)
+    # money from the same lines as the length, so the two figures describe one change
+    saved_cost = sum(max(0.0, line.cost_saving or 0) for line in savings)
     sentences = [report.message]
     if report.supported:
         sentences.append(
@@ -541,8 +543,7 @@ def drawing_summary(report, drawing_id: str) -> dict:
             sentences.append(
                 f"Syntera found shorter verified routes for {len(better)} line(s), "
                 f"{saved_mm / 1000:.1f} m less pipe in total"
-                + (f", about {_money(report.total_cost_saving, currency)} saved."
-                   if report.total_cost_saving else ".")
+                + (f", about {_money(saved_cost, currency)} saved." if saved_cost else ".")
             )  # fmt: skip
     return {
         "verdict": verdict,
@@ -555,7 +556,8 @@ def drawing_summary(report, drawing_id: str) -> dict:
             "drawn_main_piping_m": _m(drawn, 2),
             "syntera_main_piping_m": _m(report.total_optimised_length_mm, 2),
             "pipe_saved_m": round(saved_mm / 1000, 2),
-            "cost_saving": report.total_cost_saving,
+            "cost_saving": round(saved_cost, 2),
+            "net_cost_change_all_lines": report.total_cost_saving,
             "currency": currency,
         },
         "design_audit": {
