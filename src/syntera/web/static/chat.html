@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Syntera</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+    <link rel="stylesheet" href="/assets/styles.css">
+    <link rel="stylesheet" href="/assets/chat.css">
+  </head>
+  <body>
+<div class="chat-app" id="app">
+  <header class="topbar">
+    <div class="brand">
+      <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><rect x="1" y="1" width="32" height="32" rx="6" fill="var(--accent)"/><path d="M8 24 h7 a4 4 0 0 0 4 -4 v-6 a4 4 0 0 1 4 -4 h3" fill="none" stroke="var(--accent-ink)" stroke-width="3" stroke-linecap="round"/><circle cx="8" cy="24" r="2.4" fill="var(--accent-ink)"/><circle cx="26" cy="10" r="2.4" fill="var(--accent-ink)"/></svg>
+      <div><b>Syntera</b><span>Piping design by chat</span></div>
+    </div>
+    <div class="spacer"></div>
+    <div class="mode-chip" id="model-chip" title="Who answers in this chat"><i></i><span>Connecting…</span></div>
+    <button class="btn" type="button" id="new-chat">New chat</button>
+    <details class="menu expert-menu">
+      <summary class="btn">Expert view</summary>
+      <div class="menu-list">
+        <a href="/drawings">Drawings and checks</a>
+        <a href="/expert">Route workbench</a>
+        <a href="/design">Design editor</a>
+        <a href="/optimise">Optimisation study</a>
+      </div>
+    </details>
+  </header>
+
+  <main class="chat-main">
+    <section class="chat-column" aria-label="Conversation">
+      <div class="chat-log" id="log" aria-live="polite">
+        <div class="welcome" id="welcome">
+          <h1>What do you need?</h1>
+          <p>Describe it in your own words, or attach a drawing or 3D model. Syntera lays out the plant, routes the pipes, checks everything and tells you what to fix.</p>
+          <div class="suggestions" id="suggestions">
+            <button type="button" class="suggestion" data-prompt="Pump water from tank T-1 to tank T-2 with pump P-1, DN50. It has to fit in a 15 m x 12 m room.">
+              <b>Design from a sentence</b><span>"Pump water from tank T-1 to tank T-2 with pump P-1, DN50, in a 15 m x 12 m room"</span>
+            </button>
+            <button type="button" class="suggestion" data-prompt="Check the sample plant-room drawing and tell me what is wrong and what it would save.">
+              <b>Check a sample drawing</b><span>A 14-line plant-room piping drawing with a few mistakes in it</span>
+            </button>
+            <button type="button" class="suggestion" data-attach="1">
+              <b>Check my own file</b><span>DWG or DXF drawing, DEXPI P&amp;ID (.xml) or STEP model</span>
+            </button>
+          </div>
+        </div>
+      </div>
+      <form class="composer" id="composer">
+        <div class="attachments" id="attachments"></div>
+        <div class="composer-row">
+          <label class="attach-btn" title="Attach a drawing (DWG, DXF), P&amp;ID (.xml) or 3D model (STEP)">
+            <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.5 12.6 19.9a5.5 5.5 0 0 1-7.8-7.8l8.5-8.5a3.7 3.7 0 0 1 5.2 5.2l-8.5 8.5a1.8 1.8 0 0 1-2.6-2.6l7.8-7.8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span class="sr-only">Attach a file</span>
+            <input type="file" id="file-input" accept=".dwg,.dxf,.xml,.step,.stp" multiple hidden>
+          </label>
+          <textarea id="input" rows="1" placeholder="e.g. Move cooling water from the pump P-3 to the cooler E-2, DN80" aria-label="Message to Syntera"></textarea>
+          <button class="btn primary send" type="submit" id="send">Send</button>
+        </div>
+        <p class="composer-note" id="composer-note">Drop a file anywhere on the page to attach it.</p>
+      </form>
+    </section>
+
+    <section class="result-column" id="result" aria-label="Result" hidden>
+      <div class="view-tabs" id="view-tabs" role="tablist"></div>
+      <article class="result-card" id="card"></article>
+      <div class="viewer" id="viewer">
+        <canvas id="canvas" aria-label="3D view of the result"></canvas>
+        <div class="viewer-hint">Drag to turn · Shift-drag to move · Scroll to zoom</div>
+        <div class="viewer-tools">
+          <button class="btn" type="button" id="fit">Fit</button>
+          <button class="btn" type="button" id="xray" aria-pressed="false">X-ray</button>
+        </div>
+        <div class="viewer-loading" id="viewer-loading" hidden>Loading 3D…</div>
+        <div class="chat-legend" id="chat-legend"></div>
+      </div>
+    </section>
+  </main>
+</div>
+<script src="/assets/vendor/three.min.js"></script>
+<script src="/assets/chat.js"></script>
+  </body>
+</html>

@@ -7,6 +7,12 @@ services:
     init: true
     ports:
       - "${SYNTERA_PORT:-8090}:8000"
+    # Put ANTHROPIC_API_KEY=... in a .env file next to this one (never commit it) to let
+    # Claude answer in the chat; without it the chat runs in basic mode.
+    environment:
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      SYNTERA_ANTHROPIC_MODEL: ${SYNTERA_ANTHROPIC_MODEL:-claude-opus-5-5}
+      SYNTERA_ANTHROPIC_EFFORT: ${SYNTERA_ANTHROPIC_EFFORT:-medium}
     volumes:
       - ./outputs:/app/outputs
     restart: unless-stopped

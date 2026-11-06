@@ -48,6 +48,34 @@ $env:SYNTERA_PORT=9000
 docker compose up
 ```
 
+### Chat (the front page)
+
+<http://127.0.0.1:8090> opens a chat. Anyone can describe what they need in plain words
+("pump water from tank T-1 to tank T-2 with pump P-1, DN50, in a 15 m x 12 m room") or
+attach a DWG/DXF drawing, a DEXPI P&ID (.xml) or a STEP model. Syntera picks the workflow,
+runs it on the server and answers in plain language next to a result card and a 3D view:
+whether it passes, what to fix, and what Syntera's own routes save. "Expert view" in the top
+bar opens the engineering pages (drawings, route workbench at `/expert`, design editor,
+optimisation).
+
+The chat's tools are thin wrappers over the deterministic workflows (`src/syntera/chat/`):
+`design_plant` turns a plain description into P&ID connectivity for the P&ID builder (place,
+route, verify, audit), `check_drawing` runs the drawing check and reroute, `pid_to_3d` builds a
+P&ID, `audit_step` audits a STEP assembly and `use_sample` adds the sample plant-room drawing.
+Every verdict, number and saving in a reply comes from those tools; long checks run in the
+background while the page shows what Syntera is doing.
+
+With a Claude API key the conversation is free-form (Claude Opus 5.5 by default, adaptive
+thinking, prompt caching and server-side refusal fallbacks). Put the key in a `.env` file next
+to `compose.yml` (see `.env.example`; `.env` is git-ignored) and restart:
+
+```
+ANTHROPIC_API_KEY=sk-ant-...
+```
+
+Without a key the chat runs in basic mode: it handles attached files, the sample drawing and
+simple "X from A to B" sentences with the same tools, and says what it cannot do.
+
 ### Native Python
 
 ```bash

@@ -15,7 +15,7 @@ SIZED = PROJECT / "examples" / "demo_skid_sized.yaml"
 def test_both_pages_load_the_panel_and_it_only_talks_to_the_assistant_api(tmp_path, monkeypatch):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     client = TestClient(create_app(SIZED, tmp_path / "web"))
-    for page in ("/", "/drawings"):
+    for page in ("/expert", "/drawings"):
         html = client.get(page).text
         assert '<script src="/assets/assistant.js"></script>' in html
     script = client.get("/assets/assistant.js")
